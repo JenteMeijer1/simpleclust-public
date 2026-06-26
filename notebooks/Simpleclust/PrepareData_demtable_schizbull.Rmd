@@ -1,0 +1,525 @@
+---
+title: "Simple cluster"
+author: "J. Meijer"
+date: "2025-01-20"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+```
+
+
+
+
+Check for weird numbers:
+- chrfigs_fam_age
+- chrchs_timeslept
+
+
+
+Check if variables with only one option are removed.
+
+
+```{r}
+# Load libraries
+library(flextable)
+library(officer)
+library(dplyr)
+library(readr)
+library(readxl)
+
+```
+
+# Create and load basetable
+
+```{r, tidy=TRUE}
+#Load function
+source("path/to/Basetable_function.R")
+
+# Set path to dictionary
+dictionary_DIR <- "path/to/data_dictionary.xlsx"
+
+#Set path to data
+data_DIR <- file.path( "path/to/restricted_data")
+
+#Run basetable function. 
+results <- create_basetable(
+  data_DIR = data_DIR,
+  dictionary_DIR = dictionary_DIR,
+  release = "Amp_scz4",
+  timepoint= "baseline"
+)
+
+data <- results$data
+meta <- results$meta
+
+ 
+results_screening <- create_basetable(
+  data_DIR = data_DIR,
+  dictionary_DIR = dictionary_DIR,
+  release = "Amp_scz4",
+  timepoint= "screening"
+)
+
+data_screening <- results_screening$data
+meta_screening <- results_screening$meta
+
+
+
+results_month1 <- create_basetable(
+  data_DIR = data_DIR,
+  dictionary_DIR = dictionary_DIR,
+  release = "Amp_scz4",
+  timepoint= "month_1"
+)
+data_month1 <- results_month1$data
+meta_moth1 <- results_month1$meta
+
+results_month2 <- create_basetable(
+  data_DIR = data_DIR,
+  dictionary_DIR = dictionary_DIR,
+  release = "Amp_scz4",
+  timepoint= "month_2"
+)
+data_month2 <- results_month2$data
+meta_moth2 <- results_month2$meta
+
+
+results_month3<- create_basetable(
+  data_DIR = data_DIR,
+  dictionary_DIR = dictionary_DIR,
+  release = "Amp_scz4",
+  timepoint= "month_3"
+)
+data_month3 <- results_month3$data
+meta_moth3 <- results_month3$meta
+
+results_month4 <- create_basetable(
+  data_DIR = data_DIR,
+  dictionary_DIR = dictionary_DIR,
+  release = "Amp_scz4",
+  timepoint= "month_4"
+)
+data_month4 <- results_month4$data
+meta_moth4 <- results_month4$meta
+
+results_month5 <- create_basetable(
+  data_DIR = data_DIR,
+  dictionary_DIR = dictionary_DIR,
+  release = "Amp_scz4",
+  timepoint= "month_5"
+)
+data_month5 <- results_month5$data
+meta_moth5 <- results_month5$meta
+
+
+
+```
+
+```{r}
+
+## 1. Add any columns that exist only in screening ----------------------------
+new_cols   <- setdiff(names(data_screening), names(data))
+merged_data <- data %>%                     # baseline rows are the backbone
+  left_join(select(data_screening, src_subject_id, all_of(new_cols)),
+            by = "src_subject_id")
+
+## 2. Decide, variable-by-variable, whether to keep baseline or screening -----
+common_vars <- setdiff(intersect(names(data), names(data_screening)),
+                       "src_subject_id")    # overlap apart from the key
+
+# Count how many non-missing / non-empty values each data set has
+baseline_n  <- sapply(common_vars,
+                      function(v) sum(!is.na(data[[v]]) & data[[v]] != ""))
+screening_n <- sapply(common_vars,
+                      function(v) sum(!is.na(data_screening[[v]]) &
+                                      data_screening[[v]] != ""))
+
+vars_take_screening <- names(screening_n)[screening_n > baseline_n]
+
+## 3. Overwrite those columns *row-wise* with screening values ---------------
+if (length(vars_take_screening) > 0) {
+  merged_data[vars_take_screening] <-
+    data_screening %>%
+      select(src_subject_id, all_of(vars_take_screening)) %>%
+      right_join(select(merged_data, src_subject_id), by = "src_subject_id") %>%
+      select(all_of(vars_take_screening))
+}
+
+# merged_data now contains:
+#   • baseline values everywhere baseline is as complete or more complete
+#   • screening values for columns where screening had strictly fewer missing values
+```
+
+### Remove useless columns
+```{r}
+## Remove columns with only 1 unique value
+merged_data <- merged_data[, sapply(merged_data, function(col) length(unique(col))>1)]
+
+## Data preprocessing: Traumatic brain injury
+
+# Combine age with yes or no column to get rid of the Non applicable (-3)
+if("chrtbi_age_inj" %in% colnames(merged_data)){
+  merged_data$chrtbi_age_inj <- paste(merged_data$chrtbi_subject_head_injury, merged_data$chrtbi_subject_age)
+  merged_data$chrtbi_age_inj[merged_data$chrtbi_age_inj=="No NA"] <- "No"
+  merged_data$chrtbi_age_inj[merged_data$chrtbi_age_inj=="NA NA"] <- NA
+}
+
+
+# Combine how many times with yes or no column to get rid of the Non applicable (-3)
+if("chrtbi_ntimes" %in% colnames(merged_data)){
+  merged_data$chrtbi_ntimes <- paste(merged_data$chrtbi_subject_head_injury, merged_data$chrtbi_subject_times)
+  merged_data$chrtbi_ntimes[merged_data$chrtbi_ntimes=="No NA"] <- "No"
+  merged_data$chrtbi_ntimes[merged_data$chrtbi_ntimes=="NA NA"] <- NA
+}
+# Combine how many times with yes or no column to get rid of the Non applicable (-3)
+if("chrtbi_symptoms" %in% colnames(merged_data)){
+  merged_data$chrtbi_symptoms <- paste(merged_data$chrtbi_subject_head_injury, merged_data$chrtbi_subject_symptoms)
+  merged_data$chrtbi_symptoms[merged_data$chrtbi_symptoms=="No NA"] <- "No"
+  merged_data$chrtbi_symptoms[merged_data$chrtbi_symptoms=="NA NA"] <- NA
+}
+# Combine how many times with yes or no column to get rid of the Non applicable (-3)
+if("chrtbi_knockedout" %in% colnames(merged_data)){
+  merged_data$chrtbi_knockedout <- paste(merged_data$chrtbi_subject_head_injury, merged_data$chrtbi_subject_knockedout)
+  merged_data$chrtbi_knockedout[merged_data$chrtbi_knockedout=="No NA"] <- "No"
+  merged_data$chrtbi_knockedout[merged_data$chrtbi_knockedout=="NA NA"] <- NA
+}
+
+#Remove unneeded columns
+if("chrtbi_age_inj" %in% colnames(merged_data)){
+  merged_data <- select(merged_data, -c(chrtbi_subject_head_injury, chrtbi_subject_age, chrtbi_subject_times,
+                                        chrtbi_subject_symptoms, chrtbi_subject_knockedout))
+}
+
+## Include these new variables in the meta data
+
+meta <- rbind(meta, data.frame(
+  ElementName = 'chrtbi_age_inj',
+  Datatype = 'Traumatic Brain Injury',
+  Modality = 'Brain_injury',
+  stringsAsFactors = FALSE
+))
+
+meta <- rbind(meta, data.frame(
+  ElementName = 'chrtbi_ntimes',
+  Datatype = 'Traumatic Brain Injury',
+  Modality = 'Brain_injury',
+  stringsAsFactors = FALSE
+))
+
+meta <- rbind(meta, data.frame(
+  ElementName = 'chrtbi_symptoms',
+  Datatype = 'Traumatic Brain Injury',
+  Modality = 'Brain_injury',
+  stringsAsFactors = FALSE
+))
+
+meta <- rbind(meta, data.frame(
+  ElementName = 'chrtbi_knockedout',
+  Datatype = 'Traumatic Brain Injury',
+  Modality = 'Brain_injury',
+  stringsAsFactors = FALSE
+))
+
+# If variable is about a medication dose, change all -3 and -300 to 0
+# Loop through columns that have 'dose' in their names (case-insensitive)
+for (col in names(merged_data)) {
+  if (grepl("dose", col, ignore.case = TRUE)) {
+    merged_data[[col]][merged_data[[col]] %in% c(-3, -300)] <- 0
+  }
+}
+# Loop through columns that have 'med' in their names (case-insensitive)
+for (col in names(merged_data)) {
+  if (grepl("med", col, ignore.case = TRUE)) {
+    merged_data[[col]][merged_data[[col]] %in% c(-3, -300)] <- 0
+  }
+}
+
+
+# Remove all -3 and -300 when possible
+merged_data[merged_data == -3 | merged_data == -300] <- NA
+data_month2[data_month2 == -3 | data_month2 == -300] <- NA
+
+# names(merged_data)[sapply(merged_data, function(x) any(x %in% c(-3,-300), na.rm=TRUE))] #To test which columns are still containing -3 and -300.
+
+
+```
+
+
+
+### Cognition
+
+#### Standardizing using HC
+```{r}
+
+penncnb_vars <- grep("^cnb", names(merged_data), value = TRUE)
+
+# Filter HC group
+hc_data <- merged_data[merged_data$phenotype == "HC", ]
+
+# Function to compute z-scores based on HC stats
+z_score_hc <- function(x, varname) {
+  m <- mean(hc_data[[varname]], na.rm = TRUE)
+  s <- sd(hc_data[[varname]], na.rm = TRUE)
+  return((x - m) / s)
+}
+
+# Apply z-scoring to all identified variables
+for (var in penncnb_vars) {
+  merged_data[[var]] <- z_score_hc(merged_data[[var]], var)
+}
+```
+
+
+
+## Combine CAARMS 1 and 2 into one score
+```{r}
+merged_data$CAARMS_delusions <- (merged_data$psychs_caarms_p1+merged_data$psychs_caarms_p2)/2
+
+meta_newrow <- data.frame(ElementName="CAARMS_delusions", Datatype="CAARMS aggregated delusions", Modality="Include_cluster")
+meta <- rbind(meta, meta_newrow)
+
+#Remove the individual items from the data
+merged_data <- merged_data[, !names(merged_data) %in% c("psychs_caarms_p1", "psychs_caarms_p2")]
+
+```
+
+## Create trauma subscores
+
+Recoding
+```{r}
+# Normal-coded CTQ items
+ctq_normal_vars <- c(
+  "chrpps_doc", "chrpps_bruise", "chrpps_belt", "chrpps_physab", "chrpps_beat",
+  "chrpps_touch", "chrpps_threat", "chrpps_sexual", "chrpps_molest", "chrpps_sexab",
+  "chrpps_lazy", "chrpps_born", "chrpps_hate", "chrpps_hurt", "chrpps_emoab",
+  "chrpps_hunger", "chrpps_pardrunk", "chrpps_dirty"
+)
+
+# Already reverse-coded CTQ items
+ctq_reverse_vars <- c(
+  "chrpps_loved",
+  "chrpps_special",
+  "chrpps_care",
+  "chrpps_closefam",
+  "chrpps_support",
+  "chrpps_protect",
+  "chrpps_docr"
+)
+
+recode_ctq_normal <- function(x) {
+  x <- as.character(x)
+  x <- trimws(x)
+
+  dplyr::case_when(
+    x %in% c("1", "Never true") ~ 1,
+    x %in% c("2", "Rarely true") ~ 2,
+    x %in% c("3", "Sometimes true") ~ 3,
+    x %in% c("4", "Often true") ~ 4,
+    x %in% c("5", "Very often true/Always", "Very often true", "Always") ~ 5,
+    x %in% c("-99", "N/A", "NA", "Refused", "77", "Missing", "88") ~ NA_real_,
+    TRUE ~ NA_real_
+  )
+}
+
+recode_ctq_reverse <- function(x) {
+  x <- as.character(x)
+  x <- trimws(x)
+
+  dplyr::case_when(
+    x %in% c("5", "Never true") ~ 5,
+    x %in% c("4", "Rarely true") ~ 4,
+    x %in% c("3", "Sometimes true") ~ 3,
+    x %in% c("2", "Often true") ~ 2,
+    x %in% c("1", "Very often true/Always", "Very often true", "Always") ~ 1,
+    x %in% c("-99", "N/A", "NA", "Refused", "77", "Missing", "88") ~ NA_real_,
+    TRUE ~ NA_real_
+  )
+}
+
+# Apply correct recoding to each group
+merged_data[ctq_normal_vars] <- lapply(
+  merged_data[ctq_normal_vars],
+  recode_ctq_normal
+)
+
+merged_data[ctq_reverse_vars] <- lapply(
+  merged_data[ctq_reverse_vars],
+  recode_ctq_reverse
+)
+```
+
+
+```{r}
+
+merged_data$ctq_physical <- rowSums(
+  merged_data[c(
+    "chrpps_doc",
+    "chrpps_bruise",
+    "chrpps_belt",
+    "chrpps_physab",
+    "chrpps_beat"
+  )],
+  na.rm = FALSE
+)
+
+merged_data$ctq_sexual <- rowSums(
+  merged_data[c(
+    "chrpps_touch",
+    "chrpps_threat",
+    "chrpps_sexual",
+    "chrpps_molest",
+    "chrpps_sexab"
+  )],
+  na.rm = FALSE
+)
+
+merged_data$ctq_emotional <- rowSums(
+  merged_data[c(
+    "chrpps_lazy",
+    "chrpps_born",
+    "chrpps_hate",
+    "chrpps_hurt",
+    "chrpps_emoab"
+  )],
+  na.rm = FALSE
+)
+
+merged_data$ctq_other <- rowSums(
+  merged_data[c(
+    "chrpps_loved",
+    "chrpps_special",
+    "chrpps_care",
+    "chrpps_closefam",
+    "chrpps_support",
+    "chrpps_hunger",
+    "chrpps_protect",
+    "chrpps_pardrunk",
+    "chrpps_dirty",
+    "chrpps_docr"
+  )],
+  na.rm = FALSE
+)
+
+
+```
+
+Add to meta table
+```{r}
+# Add new CTQ aggregated scores to meta
+meta_newrows <- data.frame(
+  ElementName = c(
+    "ctq_physical",
+    "ctq_sexual",
+    "ctq_emotional",
+    "ctq_other"
+  ),
+  Datatype = c(
+    "CTQ aggregated physical abuse",
+    "CTQ aggregated sexual abuse",
+    "CTQ aggregated emotional abuse",
+    "CTQ aggregated other childhood adversity"
+  ),
+  Modality = c(
+    "compare_clusters",
+    "compare_clusters",
+    "compare_clusters",
+    "compare_clusters"
+  )
+)
+
+meta <- rbind(meta, meta_newrows)
+
+# Remove individual CTQ items from the data
+ctq_item_vars <- c(
+  "chrpps_doc", "chrpps_bruise", "chrpps_belt", "chrpps_physab", "chrpps_beat",
+  "chrpps_touch", "chrpps_threat", "chrpps_sexual", "chrpps_molest", "chrpps_sexab",
+  "chrpps_lazy", "chrpps_born", "chrpps_hate", "chrpps_hurt", "chrpps_emoab",
+  "chrpps_loved", "chrpps_special", "chrpps_care", "chrpps_closefam",
+  "chrpps_support", "chrpps_hunger", "chrpps_protect", "chrpps_pardrunk",
+  "chrpps_dirty", "chrpps_docr"
+)
+
+merged_data <- merged_data[, !names(merged_data) %in% ctq_item_vars]
+```
+
+
+
+### Save preprocessed data
+
+```{r}
+#Save complete merged_data. NOTE: Change to merged_data_CT if you want to include MRI
+write_csv(merged_data, 'path/to/simpleclust_data/merged_data_simpleclust.csv')
+write_csv(meta, 'path/to/simpleclust_data/merged_meta_simpleclust.csv')
+write_csv(data_month1, 'path/to/simpleclust_data/data_month1_simpleclust.csv')
+write_csv(data_month2, 'path/to/simpleclust_data/data_month2_simpleclust.csv')
+write_csv(data_month3, 'path/to/simpleclust_data/data_month3_simpleclust.csv')
+write_csv(data_month4, 'path/to/simpleclust_data/data_month4_simpleclust.csv')
+write_csv(data_month5, 'path/to/simpleclust_data/data_month5_simpleclust.csv')
+
+
+
+```
+
+# Demographic table full sample
+
+```{r}
+# Source the demographics function
+source("path/to/Demographictable_function.R")
+
+comparison <- 'phenotype'
+
+comparison_labels <- c("CHR" = "CHR", "HC" = "CC")
+
+# Generate summary table
+table <- demographic_table(merged_data, dictionary_DIR, comparison, comparison_labels)
+
+# Print table
+print(table)
+
+# Save in a word document
+save_as_docx(table, path = "Dem_table_fullSample_simpleclust.docx")
+```
+
+# Demographic table final sample with comparison between discovery and test
+
+Load in prescient IDs and add a column sample 
+```{r}
+# 1. Load the Prescient ID list once:
+
+prescient <- read.delim(
+  "path/to/restricted_data/Prescient_Client List_ DPACC ID with RA Name (ALL sites)_20_03_2025.txt",
+  sep = "\t",
+  header = TRUE,
+  stringsAsFactors = FALSE
+)
+
+colnames(prescient) <- c(
+  "fkLocationID",
+  "pkclientid",
+  "src_subject_id",
+  "RAname"
+)
+
+prescient_ids <- unique(prescient$src_subject_id)
+
+disc_data <- merged_data
+
+disc_data$sample <- ifelse(disc_data$src_subject_id %in% prescient_ids, yes="Discovery", no="Validation")
+
+```
+
+
+
+```{r}
+comparison <- 'sample'
+
+table <- demographic_table(disc_data, dictionary_DIR, comparison)
+
+print(table)
+save_as_docx(table, path = "path/to/simpleclust_data/Dem_table_sample_simpleclust.docx")
+
+```
+

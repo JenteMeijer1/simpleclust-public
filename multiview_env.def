@@ -1,0 +1,34 @@
+Bootstrap: docker
+From: python:3.11-slim
+
+%files
+    requirements_multiview_env.txt /opt/requirements_multiview_env.txt
+
+%post
+    # Update and install any necessary OS-level packages
+    apt-get update && apt-get install -y --no-install-recommends \
+        build-essential \
+        ca-certificates \
+        fonts-dejavu-core \
+        libexpat1 \
+        libfontconfig1 \
+        libfreetype6 \
+        libglib2.0-0 \
+        git \
+        r-base \
+        r-base-dev \
+        libx11-6 \
+        libxext6 \
+        libxrender1 \
+        libxtst6 \
+        && rm -rf /var/lib/apt/lists/*
+
+    # Upgrade pip and install Python dependencies
+    pip install --no-cache-dir --upgrade pip
+    pip install --no-cache-dir -r /opt/requirements_multiview_env.txt
+    pip install --no-cache-dir cvxpy tqdm numba git+https://github.com/thomaskeefe/sigclust.git
+
+%environment
+    # Set up environment variables if needed
+    export LC_ALL=C
+    export LANG=C

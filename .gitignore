@@ -1,0 +1,11 @@
+.DS_Store
+.vscode/
+.claude/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+results/
+plots/
+outputs/
+data/
+private_data/
