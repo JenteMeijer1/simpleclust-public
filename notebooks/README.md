@@ -1,8 +1,14 @@
 # Simpleclust Notebooks
 
-This folder contains only the notebook and R Markdown table workflow for the Simpleclust / Schizophrenia Bulletin public snapshot.
+This folder contains the paper-facing Simpleclust notebook files.
 
-- `Simpleclust/Main.ipynb`: downstream analysis notebook for diagnostics, figures, paper-facing summaries, and interpretation.
-- `Simpleclust/PrepareData_demtable_schizbull.Rmd`: baseline and demographic table workflow.
+## Files
 
-The table workflow depends on helper scripts exported at the repository root under `table_helpers/`.
+- `Simpleclust/Main.ipynb`: downstream analysis notebook. Use this after pipeline outputs have been generated.
+- `Simpleclust/PrepareData_demtable_schizbull.Rmd`: R Markdown workflow for baseline and demographic tables.
+
+## Notes
+
+- Notebook outputs are stripped in this public snapshot to keep the repository smaller and avoid publishing private outputs.
+- The R Markdown file depends on `table_helpers/` in the repository root.
+- Data paths inside the notebook and R Markdown file are placeholders. Replace them with local paths before running.
