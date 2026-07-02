@@ -44,6 +44,13 @@ singleclust/gather_candidates.sh
 theme.py
 ```
 
+Selected table helpers:
+
+```text
+table_helpers/Basetable_function.R
+table_helpers/Demographictable_function.R
+```
+
 To refresh this repository, rerun the export script from the private repository:
 
 ```bash
@@ -68,13 +75,13 @@ afc879b3a408b098741b57b0fb27476b22a1fbe2
 Export date:
 
 ```text
-2026-06-26
+2026-07-02
 ```
 
 Allowlist content fingerprint:
 
 ```text
-001a9190070c2b01586db27358c3ccc5536944506d08bd87c0069c2466418579
+0a449f303a1f4f5817137468de8b85ad18e6cd402faa5d73d353e45cc9e84e8a
 ```
 
 Allowlist file hashes:
@@ -109,4 +116,6 @@ f8d44784490f07d5e04fb4f443064a04bbd93666656a0a1d42defa3648a1324c  singleclust/fi
 4a9ca45274fa7603d624890da820ac2c19b6d3b812feb579a7b172f0ed5652f0  singleclust/full_pipeline_singleclust.py
 63ca536860b48536268b5b51690a542296fd57a241adf20f62e8a1f5f71e11cc  singleclust/gather_candidates.sh
 2ac0289d77ef499757376045d59c41602f41ce701357c91955918f5030848266  theme.py
+c954223bb333714ef0c1e6a6918550159df42bc2274fd67151d22cea787ee5b1  table_helpers/Basetable_function.R
+ec20be6ca1f636678b1e9dd7b32634acb19a88bddcb8495c05f94d591c4bac6b  table_helpers/Demographictable_function.R
 ```

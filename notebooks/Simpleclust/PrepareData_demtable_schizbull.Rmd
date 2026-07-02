@@ -36,7 +36,7 @@ library(readxl)
 
 ```{r, tidy=TRUE}
 #Load function
-source("path/to/Basetable_function.R")
+source("table_helpers/Basetable_function.R")
 
 # Set path to dictionary
 dictionary_DIR <- "path/to/data_dictionary.xlsx"
@@ -467,7 +467,7 @@ write_csv(data_month5, 'path/to/simpleclust_data/data_month5_simpleclust.csv')
 
 ```{r}
 # Source the demographics function
-source("path/to/Demographictable_function.R")
+source("table_helpers/Demographictable_function.R")
 
 comparison <- 'phenotype'
 
