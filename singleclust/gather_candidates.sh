@@ -1,4 +1,5 @@
 #!/bin/bash
+# Purpose: Gather and rank SimpleClust bootstrap candidates.
 #SBATCH --job-name=grid_gather
 #SBATCH --output=logs/gather_%A.log
 #SBATCH --nodes=1

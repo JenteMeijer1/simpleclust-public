@@ -26,6 +26,7 @@ from clustering_functions import decode_search_candidate
 
 
 def _normalize_dim_reduction(value):
+    """Normalize dim reduction."""
     if value is None:
         return "None"
     text = str(value).strip()
@@ -35,6 +36,7 @@ def _normalize_dim_reduction(value):
 
 
 def _candidate_file(intermediates_dir, fold_index, generation):
+    """Handle candidate file."""
     return os.path.join(
         intermediates_dir,
         f"fold{fold_index}",
@@ -44,6 +46,7 @@ def _candidate_file(intermediates_dir, fold_index, generation):
 
 
 def _fitness_values(candidate):
+    """Handle fitness values."""
     values = getattr(getattr(candidate, "fitness", None), "values", ())
     try:
         return tuple(float(v) for v in values)
@@ -52,6 +55,7 @@ def _fitness_values(candidate):
 
 
 def _candidate_metric(candidate, key, objective_index=None):
+    """Handle candidate metric."""
     summary = getattr(candidate, "metrics_summary", None) or {}
     value = summary.get(key)
     if value is None and key == "quality":
@@ -70,6 +74,7 @@ def _candidate_metric(candidate, key, objective_index=None):
 
 
 def _rank_candidates(rows):
+    """Rank candidates."""
     finite_stab = [row["stability"] for row in rows if np.isfinite(row["stability"])]
     finite_qual = [row["quality"] for row in rows if np.isfinite(row["quality"])]
     stab_min, stab_max = (min(finite_stab), max(finite_stab)) if finite_stab else (0.0, 0.0)
@@ -99,6 +104,7 @@ def _rank_candidates(rows):
 
 
 def _load_fold_candidates(args, fold_index, fsp_args):
+    """Load fold candidates."""
     path = _candidate_file(args.intermediates_dir, fold_index, args.n_generations)
     if not os.path.exists(path):
         raise FileNotFoundError(f"Scored candidate file not found for fold {fold_index}: {path}")
@@ -131,6 +137,7 @@ def _load_fold_candidates(args, fold_index, fsp_args):
 
 
 def _select_fold_candidates(args, fsp_args):
+    """Select fold candidates."""
     selected = []
     all_rows = []
     for fold_index in range(int(args.n_folds)):
@@ -145,6 +152,7 @@ def _select_fold_candidates(args, fsp_args):
 
 
 def _write_synthetic_fold_metrics(args, candidate_rows, source_results_dir, alternative_results_dir):
+    """Write synthetic fold metrics."""
     os.makedirs(alternative_results_dir, exist_ok=True)
     written = []
     for synthetic_index, row in enumerate(candidate_rows):
@@ -204,6 +212,7 @@ def _write_synthetic_fold_metrics(args, candidate_rows, source_results_dir, alte
 
 
 def _json_default(obj):
+    """Handle json default."""
     if isinstance(obj, (np.integer,)):
         return int(obj)
     if isinstance(obj, (np.floating,)):
@@ -216,6 +225,7 @@ def _json_default(obj):
 
 
 def _write_selection_outputs(output_dir, selected_rows, all_rows, args):
+    """Write selection outputs."""
     os.makedirs(output_dir, exist_ok=True)
     flat_rows = []
     for row in all_rows:
@@ -252,10 +262,12 @@ def _write_selection_outputs(output_dir, selected_rows, all_rows, args):
 
 
 def _write_synthetic_fold_manifest(output_dir, written_rows):
+    """Write synthetic fold manifest."""
     pd.DataFrame(written_rows).to_csv(os.path.join(output_dir, "synthetic_fold_manifest.csv"), index=False)
 
 
 def _build_fsp_args(args, output_final_metrics):
+    """Build fsp args."""
     search_objectives = fsp._normalize_objective_tokens(args.search_objectives, args.optimisation)
     ns = SimpleNamespace(
         input_csv=args.input_csv,
@@ -332,6 +344,7 @@ def _build_fsp_args(args, output_final_metrics):
 
 
 def parse_args():
+    """Parse args."""
     parser = argparse.ArgumentParser(
         description="Finalize a forced-k alternative simpleclust solution from existing fold search outputs."
     )
@@ -398,6 +411,7 @@ def parse_args():
 
 
 def main():
+    """Handle main."""
     args = parse_args()
     args.base_dir = os.path.abspath(args.base_dir)
     args.source_results_dir = os.path.abspath(args.source_results_dir)

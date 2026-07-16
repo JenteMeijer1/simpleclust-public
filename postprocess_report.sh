@@ -1,4 +1,5 @@
 #!/bin/bash
+# Purpose: Run notebook reporting cells and create a PDF report.
 #SBATCH --job-name=report
 #SBATCH --output=logs/postprocess_report.log
 #SBATCH --nodes=1

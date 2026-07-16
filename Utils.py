@@ -1,3 +1,5 @@
+"""Provide shared preprocessing, analysis, plotting, and notebook helpers."""
+
 import os
 import glob
 import re
@@ -19,7 +21,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from tabulate import tabulate
 from scipy.stats import skew
-from typing import Tuple 
+from typing import Tuple
 
 import random
 from scipy.stats import chi2, chi2_contingency, kruskal
@@ -57,52 +59,54 @@ except ImportError:
 #   the pipeline and notebooks.
 # - Legacy diagnostics and longitudinal helpers: older notebook/reporting
 #   utilities retained for backwards compatibility.
+# - Project notebook helpers: task-specific SimpleClust, clinical-paper, and
+#   PROSPECT helpers moved out of notebook cells.
 
 
 MODALITY_CLUSTER_PALETTES = {
     "Internalising": {
-        "0": "#00545C",
-        "1": "#7FD4CC",
-        "2": "#0B8790",
-        "3": "#BDEBE6",
-        "4": "#002F34",
-        "5": "#3FB7B2",
+        "0": "#38699A",
+        "1": "#BCDDFF",
+        "2": "#043B71",
+        "3": "#DBEDFF",
+        "4": "#1F3850",
+        "5": "#5FAFFF",
         "CC": _THEME_CC,
     },
     "Functioning": {
-        "0": "#0A5D1E",
-        "1": "#9BE08D",
-        "2": "#168A35",
-        "3": "#D7F6D2",
-        "4": "#063815",
-        "5": "#4FBE5B",
+        "0": "#B36F9C",
+        "1": "#FFDAF3",
+        "2": "#A93A84",
+        "3": "#BEA9B7",
+        "4": "#54354A",
+        "5": "#E94DB5",
         "CC": _THEME_CC,
     },
     "Detachment": {
-        "0": "#4C2CA8",
-        "1": "#C7B4F9",
-        "2": "#7056D6",
-        "3": "#E8E0FB",
-        "4": "#2E1B6F",
-        "5": "#9B83F0",
+        "0": "#389687",
+        "1": "#D3FFF8",
+        "2": "#16685A",
+        "3": "#DBEDEA",
+        "4": "#2C5A52",
+        "5": "#35EFD0",
         "CC": _THEME_CC,
     },
     "Psychoticism": {
-        "0": "#6F143F",
-        "1": "#FFB3CF",
-        "2": "#B72A70",
-        "3": "#FFE1EC",
-        "4": "#3F0822",
-        "5": "#E85A97",
+        "0": "#B45868",
+        "1": "#FCD0D7",
+        "2": "#753742",
+        "3": "#F8C6CF",
+        "4": "#560311",
+        "5": "#C81533",
         "CC": _THEME_CC,
     },
     "Cognition": {
-        "0": "#174D8C",
-        "1": "#8CCCEF",
-        "2": "#2D76C2",
-        "3": "#D0E6F8",
-        "4": "#0E2F57",
-        "5": "#5AA9DD",
+        "0": "#6D4D9C",
+        "1": "#E0CCFD",
+        "2": "#4F2291",
+        "3": "#6C607F",
+        "4": "#18003D",
+        "5": "#893AFF",
         "CC": _THEME_CC,
     },
     "Metabolic_Risk": {
@@ -179,6 +183,7 @@ EXTRA_CLUSTER_COLORS = list(_THEME_CATS) + [
 
 
 def cluster_sort_key(value):
+    """Handle cluster sort key."""
     value_str = str(value)
     if value_str == "CC":
         return (2, value_str)
@@ -320,6 +325,7 @@ def flatten_sensitivity_results(results):
     rows = []
 
     def flatten(prefix, value, out):
+        """Handle flatten."""
         if isinstance(value, dict):
             for k, v in value.items():
                 flatten(f"{prefix}.{k}" if prefix else str(k), v, out)
@@ -448,7 +454,7 @@ def chi_square_comparison(df, group_col, label_col, title_prefix="", save_path=N
         sns.heatmap(table, annot=True, fmt="d", cmap="Blues", ax=ax)
         ax.set_title(title_prefix or f"{group_col} by {label_col}")
         fig.tight_layout()
-        fig.savefig(save_path, dpi=300, bbox_inches="tight")
+        _save_matplotlib_png_pdf(fig, os.path.splitext(save_path)[0], dpi=300)
         plt.close(fig)
     return result
 
@@ -728,6 +734,7 @@ def _extract_final_latent(ae_res):
 
 
 def _format_dimred_display(dimred_display):
+    """Format dimred display."""
     method = str(dimred_display).strip().lower().replace("_", "").replace("-", "")
     display_names = {
         "none": "None",
@@ -745,6 +752,7 @@ def _format_dimred_display(dimred_display):
 
 
 def _component_axis_labels(dimred_display, dimred_method):
+    """Handle component axis labels."""
     method = dimred_method.replace("_", "").replace("-", "")
     if method in ("", "none"):
         return "PC1 (PCA fitted for visualization)", "PC2 (PCA fitted for visualization)"
@@ -1026,8 +1034,8 @@ def rank_features_by_cluster(features, clusters, top_k=10):
 
 _SIMPLECLUST_PUBLICATION_LABELS = {
     "CAARMS_delusions": "CAARMS delusions",
-    "chrnsipr_motiv_pleas_dimension": "NSI-PR motivation and pleasure",
-    "chrnsipr_motivation_and_pleasure_dimension": "NSI-PR motivation and pleasure",
+    "chrnsipr_motiv_pleas_dimension": "NSI-PR motivation/pleasure",
+    "chrnsipr_motivation_and_pleasure_dimension": "NSI-PR motivation/pleasure",
     "chrnsipr_dimin_expr_dimension": "NSI-PR diminished expression",
     "chrnsipr_diminished_expression_dimension": "NSI-PR diminished expression",
     "chrnsipr_item11_rating": "NSI-PR alogia",
@@ -1037,78 +1045,118 @@ _SIMPLECLUST_PUBLICATION_LABELS = {
     "chrnsipr_blunted_affect_domain": "NSI-PR blunted affect",
     "chrsofas_currscore": "Current SOFAS",
     "chrsofas_currscore12mo": "SOFAS 12 months ago",
-    "chrgfs_gf_social_scale": "Global functioning: social",
-    "chrgfs_gf_social_high": "Highest social functioning",
-    "chrgfs_gf_social_low": "Lowest social functioning",
-    "chrgfr_gf_role_scole": "Global functioning: role",
-    "chrgfr_gf_role_high": "Highest role functioning",
-    "chrgfr_gf_role_low": "Lowest role functioning",
-    "chrgfrs_global_role_decline": "Decline in role functioning",
-    "chrgfss_global_social_decline": "Decline in social functioning",
+    "chrgfs_gf_social_scale": "Current social GF",
+    "gf_social_scale": "Current social GF",
+    "chrgfs_gf_social_high": "Best social GF",
+    "gf_social_high": "Best social GF",
+    "chrgfs_gf_social_low": "Worst social GF",
+    "gf_social_low": "Worst social GF",
+    "chrgfr_gf_role_scole": "Current role GF",
+    "chrgfr_gf_role_score": "Current role GF",
+    "gf_role_scole": "Current role GF",
+    "gf_role_score": "Current role GF",
+    "chrgfr_gf_role_high": "Best role GF",
+    "gf_role_high": "Best role GF",
+    "chrgfr_gf_role_low": "Worst role GF",
+    "gf_role_low": "Worst role GF",
+    "chrgfrs_global_role_decline": "Role GF decline",
+    "chrgfss_global_social_decline": "Social GF decline",
     "chrsofas_lowscore": "Lowest SOFAS in past year",
     "chrsofas_premorbid": "Premorbid SOFAS",
-    "chriq_fsiq": "Full-scale IQ",
-    "fsiq": "Full-scale IQ",
-    "psychs_sips_p5": "SIPS P5 Disorganized Communication",
-    "psychs_pos_tot": "PSYCHS positive symptoms total",
-    "sips_pos_tot": "SIPS positive symptoms total",
-    "caarms_pos_tot": "CAARMS positive symptoms total",
-    "psychs_caarms_p1": "CAARMS P1 Delusions",
-    "psychs_caarms_p2": "CAARMS P2 Delusions",
-    "psychs_caarms_p3": "CAARMS P3 Grandiosity",
-    "psychs_caarms_p4": "CAARMS P4 Hallucinations",
+    "chriq_fsiq": "FSIQ",
+    "fsiq": "FSIQ",
+    "psychs_sips_p5": "SIPS P5 disorganization",
+    "psychs_pos_tot": "PSYCHS positive total",
+    "sips_pos_tot": "SIPS positive total",
+    "caarms_pos_tot": "CAARMS positive total",
+    "psychs_caarms_p1": "CAARMS P1 delusions",
+    "psychs_caarms_p2": "CAARMS P2 delusions",
+    "psychs_caarms_p3": "CAARMS P3 grandiosity",
+    "psychs_caarms_p4": "CAARMS P4 hallucinations",
+    "psychs_sips_p1": "SIPS P1 unusual thought",
+    "psychs_sips_p2": "SIPS P2 suspiciousness",
+    "psychs_sips_p3": "SIPS P3 grandiosity",
+    "psychs_sips_p4": "SIPS P4 perceptual abn.",
     "chrbprs_activation": "BPRS activation",
     "chrbprs_bprs_total": "BPRS total",
+    "chrbprs_affect_subscale": "BPRS affect",
+    "chrbprs_positive_symptom_subscale": "BPRS positive",
+    "chrbprs_pos_symp_subscale": "BPRS positive",
+    "chrbprs_negative_symptom_subscale": "BPRS negative",
+    "bprs_factor_neg_symp": "BPRS negative",
     "chrbprs_activation_subscale": "BPRS activation",
+    "chrbprs_disorganization_subscale": "BPRS disorganization",
+    "chrbprs_disorg_subscale": "BPRS disorganization",
     "bprs_factor_activation": "BPRS activation",
+    "chrcssrsb_intensity_lifetime": "C-SSRS lifetime intensity",
+    "chrcssrs_intensity_lifetime": "C-SSRS lifetime intensity",
+    "chrcssrsb_intensity_pastmonth": "C-SSRS past-month intensity",
+    "chrcssrs_intensity_pastmonth": "C-SSRS past-month intensity",
     "chrcdss_total": "CDSS total",
     "cdss": "CDSS total",
     "chrpps_empty": "Subjective emptiness",
-    "chrpps_sum13": "Childhood trauma risk score",
+    "chrpps_sum10": "Adult life-event risk",
+    "chrpps_sum13": "Trauma risk score",
+    "chrpsychs_scr_ac1": "Psychosis",
+    "chrpsychs_scr_ac2": "CAARMS BLIPS",
+    "chrpsychs_scr_ac3": "CAARMS APS frequency",
+    "chrpsychs_scr_ac4": "CAARMS APS intensity",
+    "chrpsychs_scr_ac5": "CAARMS APS",
+    "chrpsychs_scr_ac6": "CAARMS vulnerability",
+    "chrpsychs_scr_ac7": "CAARMS UHR group",
     "sips_bips_scr_lifetime": "BIPS status",
     "sips_aps_scr_lifetime": "APS status",
     "sips_grd_scr_lifetime": "GRD status",
-    "chrassist_tobacco": "ASSIST tobacco severity",
-    "chrassist_alcohol": "ASSIST alcohol severity",
-    "chrassist_cannabis": "ASSIST cannabis severity",
-    "chrassist_cocaine": "ASSIST cocaine severity",
-    "chrassist_amphetamines": "ASSIST amphetamine severity",
-    "chrassist_inhalants": "ASSIST inhalant severity",
-    "chrassist_sedatives": "ASSIST sedative severity",
-    "chrassist_hallucinogens": "ASSIST hallucinogen severity",
-    "chrassist_opiods": "ASSIST opioid severity",
-    "chrassist_opioids": "ASSIST opioid severity",
-    "chrassist_other": "ASSIST other substance severity",
-    "chroasis_oasisscore": "OASIS total score",
-    "chroasis_oasis_total10": "OASIS total score",
-    "chrpromis_total": "PROMIS total score",
-    "chrpss_total": "Perceived stress total score",
-    "chrpss_perceived_stress_scale_total": "Perceived stress total score",
-    "pss10_total": "PSS-10 total score",
-    "ctq_physical": "Childhood trauma: physical abuse",
-    "ctq_sexual": "Childhood trauma: sexual abuse",
-    "ctq_emotional": "Childhood trauma: emotional abuse",
-    "ctq_other": "Childhood trauma: other adversity",
+    "chrassist_tobacco": "ASSIST tobacco",
+    "chrassist_alcohol": "ASSIST alcohol",
+    "chrassist_cannabis": "ASSIST cannabis",
+    "chrassist_cocaine": "ASSIST cocaine",
+    "chrassist_amphetamines": "ASSIST amphetamines",
+    "chrassist_inhalants": "ASSIST inhalants",
+    "chrassist_sedatives": "ASSIST sedatives",
+    "chrassist_hallucinogens": "ASSIST hallucinogens",
+    "chrassist_opiods": "ASSIST opioids",
+    "chrassist_opioids": "ASSIST opioids",
+    "chrassist_other": "ASSIST other substances",
+    "chroasis_oasisscore": "OASIS total",
+    "chroasis_oasis_total10": "OASIS total",
+    "chrpromis_total": "PROMIS total",
+    "chrpss_total": "PSS total",
+    "chrpss_perceived_stress_scale_total": "PSS total",
+    "pss10_total": "PSS-10 total",
+    "ctq_physical": "CTQ physical abuse",
+    "ctq_sexual": "CTQ sexual abuse",
+    "ctq_emotional": "CTQ emotional abuse",
+    "ctq_other": "CTQ other adversity",
     "chrdemo_edu_max": "Highest education",
-    "chrdemo_income": "Personal income source",
+    "chrdemo_income": "Income source",
     "chrdemo_parent_occupation": "Parent occupation",
     "chrdemo_sexassigned": "Sex assigned at birth",
     "chrdemo_student": "Student status",
-    "chrdemo_working": "Paid employment status",
+    "chrdemo_working": "Paid employment",
     "race": "Race",
+    "sex": "Sex",
     "Site": "Site",
-    "cnb_er40_cr": "Emotion recognition correct responses",
-    "cnb_ctap_dom": "Finger tapping dominant-hand speed",
-    "cnb_cptn_tp": "Continuous performance true positives",
-    "cnb_volt_cr": "Visual object learning correct responses",
-    "cnb_digsym_dscor": "Digit-symbol substitution correct responses",
-    "cnb_fnb2_tp": "Fractal n-back true positives",
-    "cnb_pllt_pllttcr": "Word list learning correct recall",
+    "cnb_er40_cr": "Emotion recognition",
+    "cnb_ctap_dom": "Finger tapping",
+    "cnb_cptn_tp": "Continuous performance",
+    "cnb_volt_cr": "Visual learning",
+    "cnb_digsym_dscor": "Digit symbol",
+    "cnb_fnb2_tp": "Fractal n-back",
+    "cnb_pllt_pllttcr": "Word list recall",
     "chrrecruit" : "Recruitment source",
+    "chrpps_total" : "CTQ total score",
+    "chrpps_pa_sum" : "CTQ physical abuse score",
+    "chrpps_sa_sum" : "CTQ sexual abuse score",
+    "chrpps_ea_sum" : "CTQ emotional abuse score",
+    "chrpps_en_sum" : "CTQ emotional neglect score",
+    "chrpps_pn_sum" : "CTQ physical neglect score",
+
 }
 
 
 def _title_case_fallback_label(feature):
+    """Handle title case fallback label."""
     label = str(feature).replace("_", " ").strip()
     if not label:
         return str(feature)
@@ -1462,6 +1510,7 @@ def alluvial_sankey_force_high_top(
 
 
 def _labels_for_modality(labels_by_modality, modality, modality_index):
+    """Handle labels for modality."""
     if isinstance(labels_by_modality, dict):
         if modality not in labels_by_modality:
             raise KeyError(f"Missing subgroup labels for modality '{modality}'.")
@@ -1571,11 +1620,13 @@ def plot_subgroup_feature_profiles_by_modality(
         legend_title = "Group" if has_controls else subgroup_label
 
         def legend_label(group):
+            """Handle legend label."""
             if has_controls and str(group) == str(control_group):
                 return f"{control_label} (n={int(counts.loc[group])})"
             return f"{subgroup_label} {group} (n={int(counts.loc[group])})"
 
         def finish_profile_figure(fig, plot_kind):
+            """Handle finish profile figure."""
             fig.tight_layout()
             if out_dir is not None:
                 if plot_kind == "line":
@@ -1704,6 +1755,7 @@ def _mixed_heatmap_variable_type(values):
 
 
 def _mixed_heatmap_binary_values(values):
+    """Handle mixed heatmap binary values."""
     vals = pd.Series(values)
     numeric = pd.to_numeric(vals, errors="coerce")
     if numeric[vals.notna()].notna().all():
@@ -1734,6 +1786,7 @@ def _benjamini_hochberg(pvalues):
 
 
 def _mixed_heatmap_p_value(values, groups, var_type):
+    """Handle mixed heatmap p value."""
     frame = pd.DataFrame({"value": values, "group": groups}).dropna(subset=["value", "group"])
     if frame["group"].nunique() < 2:
         return np.nan
@@ -1758,6 +1811,7 @@ def _mixed_heatmap_p_value(values, groups, var_type):
 
 
 def _mixed_heatmap_p_text(pvalue):
+    """Handle mixed heatmap p text."""
     if not np.isfinite(pvalue):
         return ""
     if pvalue < 0.001:
@@ -1766,6 +1820,7 @@ def _mixed_heatmap_p_text(pvalue):
 
 
 def _mixed_heatmap_sig_text(pvalue):
+    """Handle mixed heatmap sig text."""
     if not np.isfinite(pvalue) or pvalue >= 0.05:
         return ""
     if pvalue < 0.001:
@@ -1960,11 +2015,19 @@ def _mixed_heatmap_display_name(feature, metadata_row):
             continue
         text = str(value).strip()
         if text and text != str(feature) and len(text) <= 52:
+            if text in _SIMPLECLUST_PUBLICATION_LABELS or (
+                "_" in text and re.fullmatch(r"[A-Za-z0-9_]+", text)
+            ):
+                return display_feature_name(text)
             return text
+    name = str(feature).split("__", 1)[-1]
+    if name in _SIMPLECLUST_PUBLICATION_LABELS:
+        return _SIMPLECLUST_PUBLICATION_LABELS[name]
     return _mixed_heatmap_feature_label(feature)
 
 
 def _mixed_heatmap_label_frame(data, labels, comparison, subject_id_column):
+    """Handle mixed heatmap label frame."""
     labels = pd.Series(np.asarray(labels).reshape(-1))
     ids = pd.Series(data[subject_id_column]).reset_index(drop=True)
     size = min(len(ids), len(labels))
@@ -2449,6 +2512,7 @@ def _get_mixed_categorical_modalities(preprocessing_details=None):
 
 
 def _is_integer_like(series):
+    """Handle is integer like."""
     vals = pd.to_numeric(series, errors="coerce").dropna()
     if vals.empty:
         return False
@@ -2477,6 +2541,7 @@ def _famd_column_split(df, max_numeric_category_levels=10):
 
 
 def _onehot_encoder_dense():
+    """Handle onehot encoder dense."""
     try:
         return OneHotEncoder(handle_unknown="ignore", sparse_output=False)
     except TypeError:
@@ -2484,6 +2549,7 @@ def _onehot_encoder_dense():
 
 
 def _low_cardinality_numeric_columns_for_dimred(df, max_unique=10):
+    """Handle low cardinality numeric columns for dimred."""
     cols = []
     for col in df.select_dtypes(include=[np.number]).columns:
         n_unique = df[col].dropna().nunique()
@@ -2493,6 +2559,7 @@ def _low_cardinality_numeric_columns_for_dimred(df, max_unique=10):
 
 
 def _normalize_dim_reduction_name(value):
+    """Normalize dim reduction name."""
     if value is None:
         return "none"
     text = str(value).strip().lower()
@@ -2613,6 +2680,7 @@ def transform_mixed_type_svd_reducer(df, reducer, subject_id_column="src_subject
 
 
 def _nonnegative_matrix_for_nmf(X, shift=None):
+    """Handle nonnegative matrix for nmf."""
     X = np.asarray(X, dtype=np.float32)
     X = np.nan_to_num(X, nan=0.0, posinf=0.0, neginf=0.0)
     if X.shape[0] == 0 or X.shape[1] == 0:
@@ -2626,6 +2694,7 @@ def _nonnegative_matrix_for_nmf(X, shift=None):
 
 
 def _make_sparse_nmf(n_components, alpha, l1_ratio, max_iter, random_state):
+    """Create sparse nmf."""
     kwargs = dict(
         n_components=int(n_components),
         init="nndsvda",
@@ -2698,6 +2767,7 @@ def transform_sparse_nmf_reducer(df, reducer, subject_id_column="src_subject_id"
 
 
 def _dim_reduction_context_from_metrics(final_metrics):
+    """Handle dim reduction context from metrics."""
     reporting = final_metrics.get("final_reporting", {}) if isinstance(final_metrics, dict) else {}
     compute_context = reporting.get("compute_context", {}) if isinstance(reporting, dict) else {}
     context = dict(compute_context or {})
@@ -2721,6 +2791,7 @@ def _dim_reduction_context_from_metrics(final_metrics):
 
 
 def _infer_dim_reduction_by_modality(final_metrics, modalities):
+    """Infer dim reduction by modality."""
     context = _dim_reduction_context_from_metrics(final_metrics)
     methods = context.get("dim_reduction_by_modality", {}) or {}
     default_method = _normalize_dim_reduction_name(context.get("dim_reduction", "none"))
@@ -2844,6 +2915,8 @@ def apply_dimensionality_reduction_to_new_data(
             else:
                 if isinstance(ae_res_discovery, dict) and isinstance(ae_res_discovery.get(mod), dict):
                     pca = ae_res_discovery[mod].get("pca_model")
+                if pca is None and isinstance(ae_res_discovery, dict):
+                    pca = ae_res_discovery.get("pca_model")
                 if pca is None and isinstance(reducers, dict):
                     pca = reducers.get(mod)
                 if pca is None:
@@ -2951,7 +3024,12 @@ def apply_dimensionality_reduction_to_new_data(
                 )
             else:
                 if isinstance(ae_res_discovery, dict) and isinstance(ae_res_discovery.get(mod), dict):
-                    reducer = ae_res_discovery[mod].get("dim_reduction_model")
+                    reducer = (
+                        ae_res_discovery[mod].get("dim_reduction_model")
+                        or ae_res_discovery[mod].get("snmf_model")
+                    )
+                if reducer is None and isinstance(ae_res_discovery, dict):
+                    reducer = ae_res_discovery.get("dim_reduction_model") or ae_res_discovery.get("snmf_model")
                 if reducer is None and isinstance(reducers, dict):
                     reducer = reducers.get(mod)
                 if reducer is None:
@@ -3015,6 +3093,313 @@ def apply_dimensionality_reduction_to_new_data(
 
     X_new = pd.concat([X_by_modality[mod].reset_index(drop=True) for mod in modalities], axis=1)
     return ae_res_new, X_new, X_by_modality
+
+
+def _series_from_svm_result(result, key):
+    """Handle series from svm result."""
+    value = (result or {}).get(key)
+    if value is None:
+        return None
+    if isinstance(value, pd.Series):
+        return value.astype(float)
+    if isinstance(value, dict):
+        return pd.Series(value, dtype=float)
+    return pd.Series(value, dtype=float)
+
+
+def _svm_latent_feature_parts(feature):
+    """Handle svm latent feature parts."""
+    text = str(feature)
+    match = re.match(r"^(?:(?P<mod>.+)__)?latent_(?P<idx>\d+)$", text)
+    if match is None:
+        return None, None
+    mod = match.group("mod")
+    return mod, int(match.group("idx")) - 1
+
+
+def _metrics_data_for_modality(final_metrics, modality, subject_id_column="src_subject_id"):
+    """Handle metrics data for modality."""
+    data = final_metrics.get("data", {}) if isinstance(final_metrics, dict) else {}
+    if isinstance(data, pd.DataFrame):
+        return data.drop(columns=[subject_id_column], errors="ignore").copy()
+    if isinstance(data, dict):
+        if modality in data and isinstance(data[modality], pd.DataFrame):
+            return data[modality].drop(columns=[subject_id_column], errors="ignore").copy()
+        if len(data) == 1:
+            only = next(iter(data.values()))
+            if isinstance(only, pd.DataFrame):
+                return only.drop(columns=[subject_id_column], errors="ignore").copy()
+    return None
+
+
+def _ae_payload_for_modality(ae_res, modality):
+    """Handle ae payload for modality."""
+    if isinstance(ae_res, dict) and "final_latent" in ae_res:
+        return ae_res
+    if isinstance(ae_res, dict) and modality in ae_res and isinstance(ae_res[modality], dict):
+        return ae_res[modality]
+    if isinstance(ae_res, dict) and len(ae_res) == 1:
+        only = next(iter(ae_res.values()))
+        if isinstance(only, dict):
+            return only
+    return None
+
+
+def _component_matrix_from_payload(payload):
+    """Handle component matrix from payload."""
+    if not isinstance(payload, dict):
+        return None, None
+    for key, method in [
+        ("pca_model", "loading_weighted_pca"),
+        ("spca_model", "loading_weighted_sparsepca"),
+        ("snmf_model", "loading_weighted_sparsenmf"),
+        ("dim_reduction_model", "loading_weighted_dimensionality_reducer"),
+    ]:
+        model = payload.get(key)
+        components = getattr(model, "components_", None)
+        if components is not None:
+            return np.asarray(components, dtype=float), method
+    return None, None
+
+
+def _normalized_abs_rows(matrix):
+    """Handle normalized abs rows."""
+    weights = np.abs(np.asarray(matrix, dtype=float))
+    weights = np.nan_to_num(weights, nan=0.0, posinf=0.0, neginf=0.0)
+    denom = weights.sum(axis=1, keepdims=True)
+    return np.divide(weights, denom, out=np.zeros_like(weights), where=denom > 0)
+
+
+def _latent_original_correlation_weights(latent, original):
+    """Handle latent original correlation weights."""
+    latent = np.asarray(latent, dtype=float)
+    original = np.asarray(original, dtype=float)
+    if latent.ndim == 1:
+        latent = latent.reshape(-1, 1)
+    weights = np.zeros((latent.shape[1], original.shape[1]), dtype=float)
+    for i in range(latent.shape[1]):
+        x = latent[:, i]
+        for j in range(original.shape[1]):
+            y = original[:, j]
+            mask = np.isfinite(x) & np.isfinite(y)
+            if mask.sum() < 3 or np.nanstd(x[mask]) == 0 or np.nanstd(y[mask]) == 0:
+                continue
+            weights[i, j] = abs(np.corrcoef(x[mask], y[mask])[0, 1])
+    return _normalized_abs_rows(weights)
+
+
+def original_feature_importance_from_svm(
+    final_metrics,
+    svm_result=None,
+    top_n=None,
+    subject_id_column="src_subject_id",
+    feature_name_prefix=True,
+):
+    """Map trained SVM feature contributions back to original/preprocessed variables.
+
+    If the SVM was trained on original/preprocessed variables, the returned table
+    is the direct SVM importance table. If the SVM was trained on latent/PCA
+    dimensions, each latent contribution is distributed across source variables
+    using absolute fitted component loadings when available. For encoders without
+    linear loadings, latent contributions are distributed by absolute
+    latent-original correlations in the discovery data.
+    """
+    if svm_result is None:
+        svm_result = final_metrics.get("svm_results", {}) if isinstance(final_metrics, dict) else {}
+
+    importance = _series_from_svm_result(svm_result, "feature_importance_mean")
+    importance_std = _series_from_svm_result(svm_result, "feature_importance_std")
+    meta = dict((svm_result or {}).get("feature_importance_meta") or {})
+    if importance is None or importance.empty:
+        raise ValueError("SVM result does not contain feature_importance_mean.")
+
+    latent_parts = {feature: _svm_latent_feature_parts(feature) for feature in importance.index}
+    if not any(idx is not None for _, idx in latent_parts.values()):
+        direct = pd.DataFrame({
+            "feature": importance.index,
+            "original_feature": importance.index,
+            "importance_mean": importance.values,
+            "importance_std": importance_std.reindex(importance.index).values if importance_std is not None else np.nan,
+            "importance_source": "direct_svm_feature_importance",
+            "svm_importance_method": meta.get("method"),
+            "svm_kernel": meta.get("kernel"),
+        }).sort_values("importance_mean", ascending=False).reset_index(drop=True)
+        return direct.head(top_n) if top_n is not None else direct
+
+    ae_res = final_metrics.get("ae_res", {}) if isinstance(final_metrics, dict) else {}
+    rows = []
+    direct_rows = []
+    modalities = sorted({mod for mod, idx in latent_parts.values() if idx is not None}, key=lambda x: "" if x is None else str(x))
+    if not modalities:
+        modalities = [None]
+
+    for modality in modalities:
+        latent_features = [
+            feature for feature, (mod, idx) in latent_parts.items()
+            if idx is not None and mod == modality
+        ]
+        if not latent_features:
+            continue
+        latent_indices = np.array([latent_parts[feature][1] for feature in latent_features], dtype=int)
+        latent_importance = importance.reindex(latent_features).to_numpy(dtype=float)
+        latent_std = (
+            importance_std.reindex(latent_features).to_numpy(dtype=float)
+            if importance_std is not None else None
+        )
+
+        source_df = _metrics_data_for_modality(final_metrics, modality, subject_id_column=subject_id_column)
+        payload = _ae_payload_for_modality(ae_res, modality)
+        if source_df is None or source_df.empty or payload is None:
+            for feature in latent_features:
+                direct_rows.append({
+                    "feature": feature,
+                    "original_feature": feature,
+                    "modality": modality,
+                    "importance_mean": float(importance.loc[feature]),
+                    "importance_std": float(importance_std.loc[feature]) if importance_std is not None and feature in importance_std.index else np.nan,
+                    "importance_source": "latent_feature_unmapped",
+                    "svm_importance_method": meta.get("method"),
+                    "svm_kernel": meta.get("kernel"),
+                })
+            continue
+
+        source_numeric = source_df.apply(pd.to_numeric, errors="coerce")
+        source_features = list(source_numeric.columns)
+        components, source_method = _component_matrix_from_payload(payload)
+        if components is not None:
+            n_components = components.shape[0]
+            valid_mask = latent_indices < n_components
+            weights = _normalized_abs_rows(components[:n_components, :len(source_features)])
+        else:
+            latent = payload.get("final_latent") if isinstance(payload, dict) else None
+            if latent is None:
+                valid_mask = np.zeros_like(latent_indices, dtype=bool)
+                weights = np.zeros((0, len(source_features)), dtype=float)
+                source_method = "latent_feature_unmapped"
+            else:
+                latent = np.asarray(latent)
+                n_components = latent.shape[1] if latent.ndim > 1 else 1
+                valid_mask = latent_indices < n_components
+                weights = _latent_original_correlation_weights(
+                    latent,
+                    source_numeric.to_numpy(dtype=float, copy=True),
+                )
+                source_method = "latent_original_correlation"
+
+        if not np.any(valid_mask):
+            continue
+
+        selected_indices = latent_indices[valid_mask]
+        selected_importance = latent_importance[valid_mask]
+        feature_scores = selected_importance @ weights[selected_indices, :]
+        if latent_std is not None:
+            selected_std = latent_std[valid_mask]
+            feature_std = selected_std @ weights[selected_indices, :]
+        else:
+            feature_std = np.full(len(source_features), np.nan)
+
+        for feature_name, score, score_std in zip(source_features, feature_scores, feature_std):
+            output_feature = (
+                f"{modality}__{feature_name}"
+                if feature_name_prefix and modality is not None and not str(feature_name).startswith(f"{modality}__")
+                else feature_name
+            )
+            rows.append({
+                "feature": output_feature,
+                "original_feature": feature_name,
+                "modality": modality,
+                "importance_mean": float(score),
+                "importance_std": float(score_std) if np.isfinite(score_std) else np.nan,
+                "importance_source": source_method,
+                "svm_importance_method": meta.get("method"),
+                "svm_kernel": meta.get("kernel"),
+            })
+
+    out = pd.DataFrame(rows + direct_rows)
+    if out.empty:
+        raise ValueError("Could not map any SVM latent features back to original variables.")
+    out = (
+        out
+        .groupby(["feature", "original_feature", "modality", "importance_source", "svm_importance_method", "svm_kernel"], dropna=False, as_index=False)
+        .agg(importance_mean=("importance_mean", "sum"), importance_std=("importance_std", "sum"))
+        .sort_values("importance_mean", ascending=False)
+        .reset_index(drop=True)
+    )
+    return out.head(top_n) if top_n is not None else out
+
+
+def plot_svm_feature_contributions(
+    importance_df,
+    feature_col="feature",
+    importance_col="importance_mean",
+    std_col="importance_std",
+    display_col=None,
+    top_n=25,
+    xlabel="Feature contribution",
+    ylabel="Feature",
+    title=None,
+    order_features=None,
+    palette=None,
+    figsize=None,
+    ax=None,
+):
+    """Plot SVM feature contributions using the compact horizontal-bar style."""
+    if importance_df is None or len(importance_df) == 0:
+        raise ValueError("importance_df is empty.")
+    if feature_col not in importance_df or importance_col not in importance_df:
+        raise KeyError(f"importance_df must contain '{feature_col}' and '{importance_col}'.")
+
+    plot_df = importance_df.copy()
+    plot_df = plot_df.replace([np.inf, -np.inf], np.nan).dropna(subset=[importance_col])
+    plot_df = plot_df.sort_values(importance_col, ascending=False).head(top_n)
+    if order_features is not None and feature_col in plot_df:
+        ordered = [f for f in order_features(plot_df[feature_col]) if f in set(plot_df[feature_col])]
+        if ordered:
+            plot_df = plot_df.set_index(feature_col).loc[ordered].reset_index()
+    plot_df = plot_df.iloc[::-1].reset_index(drop=True)
+
+    if display_col is not None and display_col in plot_df:
+        labels = plot_df[display_col].astype(str)
+    else:
+        labels = plot_df[feature_col].map(display_feature_name).astype(str)
+
+    n_rows = max(len(plot_df), 1)
+    if figsize is None:
+        figsize = (plt.rcParams.get("figure.figsize", [6.4, 4.8])[0], max(4.0, 0.28 * n_rows))
+    if palette is None:
+        palette = list(_THEME_CATS)
+    colors = [palette[i % len(palette)] for i in range(len(plot_df))]
+
+    if ax is None:
+        fig, ax = plt.subplots(figsize=figsize)
+    else:
+        fig = ax.figure
+
+    xerr = None
+    if std_col in plot_df and plot_df[std_col].notna().any():
+        xerr = plot_df[std_col].fillna(0.0).to_numpy(dtype=float)
+
+    ax.barh(
+        labels,
+        plot_df[importance_col].to_numpy(dtype=float),
+        xerr=xerr,
+        color=colors,
+        edgecolor="white",
+        linewidth=0.4,
+    )
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    if title:
+        ax.set_title(title)
+    ax.tick_params(axis="y", labelsize=8)
+    ax.tick_params(axis="x", labelsize=8)
+    ax.grid(False)
+    for spine in ax.spines.values():
+        spine.set_visible(True)
+        spine.set_color("#B8C0CC")
+        spine.set_linewidth(0.8)
+    fig.tight_layout()
+    return fig, ax, plot_df
 
 
 def _fit_transform_famd_like(chr_df, cc_df=None, subject_id_column="src_subject_id"):
@@ -3670,12 +4055,14 @@ def alluvial_sankey_general(
         df[col] = df[col].astype(str)
 
     def norm(value):
+        """Handle norm."""
         return str(value).strip().lower().replace(" ", "_")
 
     high_norm = norm(high_token)
     low_norm = norm(low_token)
 
     def sort_label_key(label):
+        """Handle sort label key."""
         label_norm = norm(label)
         try:
             numeric_value = float(label)
@@ -3693,6 +4080,7 @@ def alluvial_sankey_general(
         return (0, numeric_key)
 
     def infer_final_order():
+        """Infer final order."""
         vals = list(df[final_name].unique())
         if final_order == "auto":
             previous_stage = stages[-2]
@@ -3719,6 +4107,7 @@ def alluvial_sankey_general(
     stage_label_order[final_name] = infer_final_order()
 
     def y_positions(labels):
+        """Handle y positions."""
         labels = list(labels)
         n_labels = len(labels)
         if n_labels == 0:
@@ -3746,6 +4135,7 @@ def alluvial_sankey_general(
     node_y = []
 
     def add_node(stage, label):
+        """Add node."""
         key = (stage, str(label))
         if key in node_index:
             return node_index[key]
@@ -3865,12 +4255,14 @@ def domain_map(
         df[col] = df[col].astype(str)
 
     def norm(value):
+        """Handle norm."""
         return str(value).strip().lower().replace(" ", "_")
 
     top_norm = norm(top_token)
     bottom_norm = norm(bottom_token)
 
     def canonicalize_label(value):
+        """Handle canonicalize label."""
         value = str(value).strip()
         value_norm = norm(value)
         if top_norm and top_norm in value_norm:
@@ -3891,6 +4283,7 @@ def domain_map(
     agg[final_name] = agg[final_name].astype(str)
 
     def sort_label_key(label):
+        """Handle sort label key."""
         label_norm = norm(label)
         try:
             numeric_value = float(label)
@@ -3910,6 +4303,7 @@ def domain_map(
     final_vals = [str(value) for value in agg[final_name].unique()]
 
     def infer_final_order():
+        """Infer final order."""
         explicit = []
         if final_top_value is not None:
             explicit.append(str(final_top_value))
@@ -3961,9 +4355,11 @@ def domain_map(
     )
 
     def spacers_for_order(order):
+        """Handle spacers for order."""
         return SPACERS[:max(0, len(order) - 1)]
 
     def spacer_values_for_order(order):
+        """Handle spacer values for order."""
         return [
             spacer
             for gap_spacers in spacers_for_order(order)
@@ -3993,6 +4389,7 @@ def domain_map(
         agg = pd.concat([agg, pd.DataFrame(dummies)], ignore_index=True)
 
     def with_optional_spacers(order):
+        """Handle with optional spacers."""
         order = [str(value) for value in order]
         if not add_spacer or len(order) < 2:
             return order
@@ -4082,17 +4479,220 @@ def domain_map(
     fig.update_xaxes(visible=False, showticklabels=False, showgrid=False, zeroline=False)
     fig.update_yaxes(visible=False, showticklabels=False, showgrid=False, zeroline=False)
 
+    def save_matplotlib_domain_map(output_stem):
+        """Save matplotlib domain map."""
+        import matplotlib.patches as mpatches
+        import matplotlib.path as mpath
+        import matplotlib.colors as mcolors
+
+        plot_cols = stage_order + [final_name]
+        plot_agg = agg.loc[~agg["_is_spacer"], plot_cols + ["count"]].copy()
+        plot_agg["count"] = pd.to_numeric(plot_agg["count"], errors="coerce").fillna(0.0)
+        plot_agg = plot_agg.loc[plot_agg["count"] > 0]
+        if plot_agg.empty:
+            raise ValueError("No non-zero domain-map paths are available to save.")
+
+        dim_names = plot_cols
+        dim_orders = {stage: stage_orders[stage] for stage in stage_order}
+        dim_orders[final_name] = final_order
+        x_positions = np.linspace(0.08, 0.92, len(dim_names))
+
+        total_count = float(plot_agg["count"].sum())
+        if total_count <= 0:
+            raise ValueError("Domain-map counts sum to zero.")
+
+        y_top = 0.88
+        y_bottom = 0.12
+        y_span = y_top - y_bottom
+        category_gap = 0.018
+        bar_width = 0.018
+        dim_bands = {}
+        dim_usable_spans = {}
+        y_positions = {}
+        for dim in dim_names:
+            totals = plot_agg.groupby(dim, dropna=False)["count"].sum()
+            ordered = [str(value) for value in dim_orders[dim] if str(value) in totals.index.astype(str)]
+            extras = sorted(
+                [str(value) for value in totals.index.astype(str) if str(value) not in ordered],
+                key=sort_label_key,
+            )
+            ordered.extend(extras)
+            gap_total = category_gap * max(0, len(ordered) - 1)
+            usable_span = max(0.1, y_span - gap_total)
+            dim_usable_spans[dim] = usable_span
+            current_top = y_top
+            dim_bands[dim] = {}
+            y_positions[dim] = {}
+            for value in ordered:
+                value_count = float(totals.loc[value])
+                height = usable_span * value_count / total_count
+                lower = current_top - height
+                dim_bands[dim][value] = (lower, current_top)
+                y_positions[dim][value] = (lower + current_top) / 2
+                current_top = lower - category_gap
+
+        def to_mpl_color(value, alpha=0.62):
+            """Handle to mpl color."""
+            value = str(value)
+            match = re.match(r"rgba\((\d+),\s*(\d+),\s*(\d+),\s*([0-9.]+)\)", value)
+            if match:
+                r, g, b, a = match.groups()
+                return (int(r) / 255, int(g) / 255, int(b) / 255, float(a) * alpha)
+            try:
+                r, g, b, a = mcolors.to_rgba(value)
+                return (r, g, b, min(a, alpha))
+            except ValueError:
+                return (0.47, 0.47, 0.47, alpha)
+
+        fig_mpl, ax = plt.subplots(figsize=(max(width / 100, 6), max(height / 100, 4)))
+        ax.set_xlim(0, 1)
+        ax.set_ylim(0, 1)
+        ax.axis("off")
+        ax.set_title(title, fontsize=14, pad=16)
+
+        for left_dim, right_dim, x0, x1 in zip(dim_names[:-1], dim_names[1:], x_positions[:-1], x_positions[1:]):
+            group_cols = list(dict.fromkeys([left_dim, right_dim, final_name]))
+            pair_counts = (
+                plot_agg
+                .groupby(group_cols, dropna=False)["count"]
+                .sum()
+                .reset_index()
+            )
+            pair_counts["_left_order"] = pair_counts[left_dim].astype(str).map(
+                {value: idx for idx, value in enumerate(dim_bands[left_dim])}
+            )
+            pair_counts["_right_order"] = pair_counts[right_dim].astype(str).map(
+                {value: idx for idx, value in enumerate(dim_bands[right_dim])}
+            )
+            pair_counts["_final_order"] = pair_counts[final_name].astype(str).map(
+                {value: idx for idx, value in enumerate(final_order)}
+            ).fillna(len(final_order))
+            pair_counts = pair_counts.sort_values(
+                ["_left_order", "_right_order", "_final_order"],
+                kind="mergesort",
+            )
+            left_offsets = {
+                (left_dim, value): upper
+                for value, (_, upper) in dim_bands[left_dim].items()
+            }
+            right_offsets = {
+                (right_dim, value): upper
+                for value, (_, upper) in dim_bands[right_dim].items()
+            }
+            for _, row in pair_counts.iterrows():
+                left_value = str(row[left_dim])
+                right_value = str(row[right_dim])
+                final_value = str(row[final_name])
+                if left_value not in dim_bands[left_dim] or right_value not in dim_bands[right_dim]:
+                    continue
+                count = float(row["count"])
+                left_height = dim_usable_spans[left_dim] * count / total_count
+                right_height = dim_usable_spans[right_dim] * count / total_count
+                left_upper = left_offsets[(left_dim, left_value)]
+                left_lower = left_upper - left_height
+                right_upper = right_offsets[(right_dim, right_value)]
+                right_lower = right_upper - right_height
+                left_offsets[(left_dim, left_value)] = left_lower
+                right_offsets[(right_dim, right_value)] = right_lower
+
+                x_left = x0 + bar_width / 2
+                x_right = x1 - bar_width / 2
+                dx = (x_right - x_left) * 0.45
+                verts = [
+                    (x_left, left_upper),
+                    (x_left + dx, left_upper),
+                    (x_right - dx, right_upper),
+                    (x_right, right_upper),
+                    (x_right, right_lower),
+                    (x_right - dx, right_lower),
+                    (x_left + dx, left_lower),
+                    (x_left, left_lower),
+                    (x_left, left_upper),
+                ]
+                codes = [
+                    mpath.Path.MOVETO,
+                    mpath.Path.CURVE4,
+                    mpath.Path.CURVE4,
+                    mpath.Path.CURVE4,
+                    mpath.Path.LINETO,
+                    mpath.Path.CURVE4,
+                    mpath.Path.CURVE4,
+                    mpath.Path.CURVE4,
+                    mpath.Path.CLOSEPOLY,
+                ]
+                facecolor = to_mpl_color(color_map.get(final_value, "rgba(120,120,120,0.45)"))
+                ax.add_patch(
+                    mpatches.PathPatch(
+                        mpath.Path(verts, codes),
+                        facecolor=facecolor,
+                        edgecolor=facecolor,
+                        linewidth=0.2,
+                        zorder=1,
+                    )
+                )
+
+        for dim, x in zip(dim_names, x_positions):
+            ax.text(x, 0.965, dim, ha="center", va="bottom", fontsize=11, fontweight="bold")
+            for value, (lower, upper) in dim_bands[dim].items():
+                rect = mpatches.Rectangle(
+                    (x - bar_width / 2, lower),
+                    bar_width,
+                    upper - lower,
+                    facecolor="#f6f6f6",
+                    edgecolor="#111111",
+                    linewidth=0.7,
+                    zorder=3,
+                )
+                ax.add_patch(rect)
+                label_x = x + bar_width * 0.85
+                ax.text(
+                    label_x,
+                    (lower + upper) / 2,
+                    str(value),
+                    ha="left",
+                    va="center",
+                    fontsize=10,
+                    color="#111111",
+                    zorder=4,
+                )
+
+        legend_handles = [
+            mpatches.Patch(color=to_mpl_color(color_map[value], alpha=0.9), label=f"{final_name} = {value}")
+            for value in final_order
+            if value in color_map
+        ]
+        if legend_handles:
+            ax.legend(
+                handles=legend_handles,
+                loc="lower center",
+                bbox_to_anchor=(0.5, -0.04),
+                ncol=min(len(legend_handles), 4),
+                frameon=False,
+                title=f"Ribbon color = {final_name}",
+            )
+
+        saved_paths = _save_matplotlib_png_pdf(fig_mpl, output_stem, dpi=300)
+        plt.close(fig_mpl)
+        return saved_paths
+
     if show:
         fig.show()
 
     if plots_dir is not None and save_file_name:
         save_path = os.path.join(plots_dir, save_file_name)
+        output_stem = os.path.splitext(save_path)[0]
         try:
-            fig.write_image(save_path, scale=2)
+            for extension in (".png", ".pdf"):
+                fig.write_image(output_stem + extension, scale=2)
         except Exception as err:
             fallback = os.path.splitext(save_path)[0] + ".html"
             fig.write_html(fallback)
-            print(f"WARNING: could not write static parcats image ({err}). Saved HTML fallback to: {fallback}")
+            saved_paths = save_matplotlib_domain_map(output_stem)
+            print(
+                "WARNING: could not write static Plotly parcats image "
+                f"({err}). Saved Matplotlib PDF/PNG fallback to: "
+                f"{', '.join(map(str, saved_paths))}. Interactive HTML saved to: {fallback}"
+            )
 
     return fig, stage_order
 
@@ -4101,7 +4701,7 @@ parcats_low_on_top_with_gap_keep_final_numeric = domain_map
 
 
 ##############################################
-# Define labels for ordinal scale 
+# Define labels for ordinal scale
 ##############################################
 
 LabelSpec = Dict[str, Any]
@@ -4319,8 +4919,8 @@ LABEL_SPECS: List[LabelSpec] = [
             2: "Mild - Frequent thoughts of being better off dead, or occasional thoughts or occasional thoughts of suicide",
             3: "Moderate - Deliberately considered suicide with a plan, but made no attempt",
             4: "Severe - Suicidal attempt apparantly designed to end in death (i.e.: accidental discovery or inefficient means)"
-        
-        }   
+
+        }
     },
 
     {
@@ -4757,8 +5357,6 @@ LABEL_SPECS: List[LabelSpec] = [
 ]
 
 
-
-
 ##############################################
 # Extract date
 ##############################################
@@ -4767,11 +5365,11 @@ def extract_date(file_path, prefix):
     """
     Extracts the date from the filename by removing the specified prefix and the '.csv' suffix.
     Assumes the remaining part of the filename is in the format 'YYYY-MM-DD'.
-    
+
     Parameters:
         file_path (str): The path to the file.
         prefix (str): The prefix to remove (e.g., 'basetable_' or 'metatable_').
-    
+
     Returns:
         datetime: The extracted date.
     """
@@ -4827,7 +5425,7 @@ def split_by_network(df, prescient_ids, id_col='src_subject_id'):
     discovery_df = {}
     test_df = {}
 
-   
+
     # 1. Ensure a DataFrame
     if isinstance(df, pd.Series):
         df_mod = df.to_frame().copy()
@@ -4852,7 +5450,6 @@ def split_by_network(df, prescient_ids, id_col='src_subject_id'):
     return discovery_df, test_df
 
 
-
 ##############################################
 # Get seperate data for each modality
 ##############################################
@@ -4863,18 +5460,18 @@ def extract_modalities(
 ) -> dict:
     """
     Extracts separate DataFrames for each modality from the data using the meta table.
-    
+
     Parameters:
     - meta (pd.DataFrame): A DataFrame with at least the columns 'ElementName' and 'Modality'.
     - data (pd.DataFrame): A DataFrame containing 'src_subject_id' and variables as columns.
-    
+
     Returns:
     - modality_dfs (dict): A dictionary where each key is a modality and each value is a DataFrame
       that includes 'src_subject_id' and the variables associated with that modality.
     """
     # Get unique, non-null modalities
     modalities = meta['Modality'].dropna().unique()
-    
+
     # Dictionary to store the DataFrame for each modality
     modality_dfs = {}
 
@@ -4913,7 +5510,6 @@ def extract_modalities(
     return modality_dfs
 
 
-
 ##############################################
 # Remove high missing columns and rows
 ##############################################
@@ -4927,17 +5523,17 @@ def remove_high_missing_data(
     """
     Removes columns (variables) with more than col_threshold fraction of missing values
     and then removes rows (subjects) with more than row_threshold fraction of missing values.
-    
+
     The subject_id_column is always preserved.
-    
+
     Parameters:
         df (pd.DataFrame): Input DataFrame.
         subject_id_column (str): Column to preserve.
-        col_threshold (float): Max allowed fraction of missing values per column. 
+        col_threshold (float): Max allowed fraction of missing values per column.
                                e.g., 0.5 => drop columns with over 50% missing.
         row_threshold (float): Max allowed fraction of missing values per row.
                                e.g., 0.5 => drop rows with over 50% missing.
-    
+
     Returns:
         pd.DataFrame: Cleaned DataFrame with the subject_id_column preserved.
     """
@@ -4993,6 +5589,7 @@ def remove_high_missing_data_split(
         (cleaned_discovery_df, cleaned_test_df)
     """
     def split_ids(df):
+        """Split ids."""
         if subject_id_column in df.columns:
             return df[[subject_id_column]], df.drop(columns=[subject_id_column])
         else:
@@ -5003,6 +5600,7 @@ def remove_high_missing_data_split(
 
     # 1) Identify columns passing threshold in each
     def passing_columns(df_data):
+        """Handle passing columns."""
         n_rows = df_data.shape[0]
         min_non_missing = int(np.ceil((1 - col_threshold) * n_rows))
         return set(df_data.dropna(axis=1, thresh=min_non_missing).columns)
@@ -5017,6 +5615,7 @@ def remove_high_missing_data_split(
 
     # 3) Drop rows exceeding the row_threshold
     def drop_bad_rows(df_data):
+        """Handle drop bad rows."""
         n_cols = df_data.shape[1]
         min_non_missing = int(np.ceil((1 - row_threshold) * n_cols))
         return df_data.dropna(axis=0, thresh=min_non_missing)
@@ -5026,6 +5625,7 @@ def remove_high_missing_data_split(
 
     # 4) Re-attach subject IDs to the filtered rows
     def reattach(ids, data):
+        """Handle reattach."""
         if ids is None:
             return data
         return ids.loc[data.index].join(data, how='inner')
@@ -5036,7 +5636,6 @@ def remove_high_missing_data_split(
     return cleaned_discovery, cleaned_test
 
 
-
 def remove_high_missing_data_test(
     df: pd.DataFrame,
     df_discovery: pd.DataFrame,
@@ -5045,7 +5644,7 @@ def remove_high_missing_data_test(
     row_threshold: float = 0.5
 ) -> pd.DataFrame:
     """
-    Keeps all columns that exist in discovery. 
+    Keeps all columns that exist in discovery.
     """
     # Separate subject IDs to ensure they aren't dropped
     if subject_id_column in df.columns:
@@ -5054,10 +5653,10 @@ def remove_high_missing_data_test(
     else:
         subject_ids = None
         df_data = df.copy()
-    
+
     # Keep only columns that exist in discovery
     df_data = df_data[df_data.columns.intersection(df_discovery.columns)]
-    
+
 
     # 2) Drop rows with more than 'row_threshold' fraction missing.
     #    Keep rows with at least (1 - row_threshold) * current_num_cols non-missing values.
@@ -5083,13 +5682,13 @@ def remove_missing_from_modalities(
 ) -> dict:
     """
     Applies remove_high_missing_data to each modality DataFrame in the modalities_data dictionary.
-    
+
     Parameters:
         modalities_data (dict): Dictionary where keys are modality names and values are DataFrames.
         subject_id_column (str): Column that identifies the subject.
         col_threshold (float): Drop columns with missing fraction > col_threshold.
         row_threshold (float): Drop rows with missing fraction > row_threshold.
-    
+
     Returns:
         dict: Dictionary with the same keys as modalities_data, where each DataFrame has had high-missing
               columns and rows removed.
@@ -5105,8 +5704,6 @@ def remove_missing_from_modalities(
     return cleaned_modalities
 
 
-
-
 ##############################################
 # Log transform
 ##############################################
@@ -5118,7 +5715,7 @@ def auto_power_transform(
 ) -> pd.DataFrame:
     """
     Applies Yeo-Johnson power transformation to highly skewed numerical columns.
-    
+
     Parameters:
         df (pd.DataFrame): The input DataFrame.
         skew_threshold (float): The absolute skewness value above which transformation is applied.
@@ -5198,8 +5795,6 @@ def apply_power_transform_from_details(
         transformed[col] = x_out
 
     return transformed
-
-     
 
 
 ##############################################
@@ -5285,10 +5880,6 @@ def impute_diverse_data(df: pd.DataFrame, subject_id_column: str = 'src_subject_
     return df_imputed
 
 
-
-
-
-
 def impute_data(modalities_data: dict, subject_id_column: str = 'src_subject_id', n_neighbors: int = 7) -> dict:
     """
     Applies KNN imputation for diverse data types to each modality DataFrame.
@@ -5327,9 +5918,6 @@ def impute_data(modalities_data: dict, subject_id_column: str = 'src_subject_id'
     return imputed_modalities
 
 
-
-
-
 ##############################################
 # Data scaling
 ##############################################
@@ -5343,13 +5931,13 @@ def scale_diverse_data (
     """
     Scales only the continuous numeric columns in a DataFrame while leaving binary/low‐cardinality
     numeric columns and non-numeric columns (categorical, dates, etc.) unchanged.
-    
+
     Parameters:
       df (pd.DataFrame): The input DataFrame.
       subject_id_column (str): The name of the subject identifier column to preserve.
       scaler_type (str): 'standard' for StandardScaler or 'minmax' for MinMaxScaler.
 
-    
+
     Returns:
       pd.DataFrame: The DataFrame with continuous numeric columns scaled.
       If return_details=True, returns (DataFrame, details_dict).
@@ -5419,7 +6007,6 @@ def scale_diverse_data (
     return final_df
 
 
-
 def scale_data(
     modalities_data: dict,
     subject_id_column: str = 'src_subject_id',
@@ -5428,12 +6015,12 @@ def scale_data(
     ) -> dict:
     """
     Applies the scale_diverse_data function to each modality DataFrame in the modalities_data dictionary.
-    
+
     Parameters:
       modalities_data (dict): Dictionary where keys are modality names and values are DataFrames.
       subject_id_column (str): Column to be preserved (not scaled).
       scaler_type (str): 'standard' for StandardScaler or 'minmax' for MinMaxScaler.
-    
+
     Returns:
       dict: Dictionary with the same keys as modalities_data, where each DataFrame has its continuous
             numeric columns scaled.
@@ -5516,6 +6103,7 @@ def apply_scaling_to_modalities_from_details(
     modality_scaling_details: dict,
     subject_id_column: str = 'src_subject_id'
 ) -> dict:
+    """Apply scaling to modalities from details."""
     out = {}
     for mod, df_mod in modalities_data.items():
         out[mod] = apply_scaling_from_details(
@@ -5582,11 +6170,6 @@ def impute_data_with_reference(
     return imputed
 
 
-
-
-
-
-
 ##############################################
 # Convert data for VAE structure
 ##############################################
@@ -5602,18 +6185,18 @@ def dummy_code(
       - Ordinal encodes variables based on LABEL_SPECS
       - One-hot encodes remaining categorical (object) columns
       - Returns a fully numeric DataFrame including the subject identifier (if present)
-    
+
     Parameters:
       df (pd.DataFrame): Input DataFrame.
       subject_id_column (str): Column name for the subject identifier.
       columns_to_encode (list | None): Optional subset of raw columns that should
         receive ordinal/one-hot encoding. When None, all object columns are encoded.
-    
+
     Returns:
       pd.DataFrame: Preprocessed DataFrame ready for model input.
     """
     df = df.copy()
-    
+
     # Separate subject ID column
     if subject_id_column in df.columns:
         subject_ids = df[[subject_id_column]]
@@ -5621,7 +6204,7 @@ def dummy_code(
     else:
         subject_ids = None
         df_data = df.copy()
-    
+
     # Normalize common missing-value strings before deciding whether an object
     # column is numeric, ordinal text, or nominal text.
     object_columns = df_data.select_dtypes(include=['object', 'string']).columns.tolist()
@@ -5703,12 +6286,12 @@ def dummy_code(
                 df_data[dummy_cols] = df_data[dummy_cols].astype(float)
                 df_data.loc[missing_mask.to_numpy(), dummy_cols] = np.nan
     # ----------------------------------------
-    
+
     # Convert boolean columns to integers (True -> 1, False -> 0)
     bool_cols = df_data.select_dtypes(include=['bool']).columns.tolist()
     for col in bool_cols:
         df_data[col] = df_data[col].astype(int)
-    
+
     # Reattach the subject ID column
     if subject_ids is not None:
         df_processed = pd.concat([subject_ids, df_data], axis=1)
@@ -5716,7 +6299,6 @@ def dummy_code(
         df_processed = df_data
 
     return df_processed
-
 
 
 def convert_df_for_vae(df: pd.DataFrame, subject_id_column: str = 'src_subject_id'):
@@ -5732,28 +6314,27 @@ def convert_df_for_vae(df: pd.DataFrame, subject_id_column: str = 'src_subject_i
       numeric_array (np.ndarray): 2D NumPy array (n_samples, n_features) for VAE training.
     """
     df = df.copy()
-    
+
     # Separate subject IDs if present
     if subject_id_column in df.columns:
         subject_ids = df[subject_id_column].values
         df.drop(columns=[subject_id_column], inplace=True)
     else:
         subject_ids = None
-    
-    numeric_array = df.apply(pd.to_numeric, errors='coerce').values.astype(np.float32)
-    
-    return subject_ids, numeric_array
 
+    numeric_array = df.apply(pd.to_numeric, errors='coerce').values.astype(np.float32)
+
+    return subject_ids, numeric_array
 
 
 def convert_data_for_vae(modalities_data: dict, subject_id_column: str = 'src_subject_id') -> dict:
     """
     Convert each modality DataFrame in a dictionary to a numeric format for VAE training.
-    
+
     Parameters:
       modalities_data (dict): Dictionary where keys are modality names and values are DataFrames.
       subject_id_column (str): Column name for the subject identifier.
-    
+
     Returns:
       converted_data (dict): Dictionary where each key is a modality and each value is a tuple:
                              (subject_ids, numeric_array)
@@ -5763,9 +6344,6 @@ def convert_data_for_vae(modalities_data: dict, subject_id_column: str = 'src_su
         subject_ids, numeric_array = convert_df_for_vae(df, subject_id_column)
         converted_data[modality] = (subject_ids, numeric_array)
     return converted_data
-
-
-
 
 
 ##############################################
@@ -5779,25 +6357,25 @@ def compute_PCA(df, n_components=None):
        # Drop 'src_subject_id' and 'interview_date' if they are in the dataframe
         columns_to_exclude = ['src_subject_id', 'interview_date']
         df_clean = df.drop(columns=[col for col in columns_to_exclude if col in df.columns])
-        
+
         # Optionally, keep only numeric columns if the dataframe contains non-numeric data
         df_numeric = df_clean.select_dtypes(include=['number'])
-        
+
         # Initialize and fit PCA
         pca = PCA(n_components=n_components)
         pca.fit(df_numeric)
-        
+
         return pca
 
 
 def run_pca_on_modalities(data_dict, n_components=None):
     """
     Runs PCA for each modality in a dictionary of dataframes.
-    
+
     Parameters:
     - data_dict (dict): Dictionary where keys are modality names and values are DataFrames.
     - n_components (int or None): Number of components to keep. If None, all components are kept.
-    
+
     Returns:
     - pca_results (dict): Dictionary with modality names as keys and PCA results as values.
                            Each value is a dict containing:
@@ -5815,7 +6393,7 @@ def run_pca_on_modalities(data_dict, n_components=None):
             'explained_variance_ratio': pca.explained_variance_ratio_,
             'components': pca.components_
         }
-        
+
     return pca_results
 
 # Example usage:
@@ -5826,8 +6404,6 @@ def run_pca_on_modalities(data_dict, n_components=None):
 # }
 # pca_results = run_pca_on_modalities(modalities, n_components=5)
 # print(pca_results['modality1']['explained_variance_ratio'])
-
-
 
 
 ##################### PLOTS #####################
@@ -5886,7 +6462,7 @@ def plot_latent_feature_crosscorr(
 
     for i in range(latent_dim):
         ax = axes[i]
-        
+
         # Sort features **per latent variable**
         sorted_indices = np.argsort(-cross_corr[i])  # Sort descending
         sorted_corrs = cross_corr[i, sorted_indices]
@@ -5932,10 +6508,6 @@ def plot_latent_feature_crosscorr(
     plt.show()
 
 
-
-
-
-
 def top10_features_per_latent(
     latent_variables: np.ndarray,
     original_data: np.ndarray,
@@ -5971,7 +6543,7 @@ def top10_features_per_latent(
     # Compute correlation matrix (currently using Pearson)
     combined = np.hstack((latent_variables, original_data))
     corr_matrix = np.corrcoef(combined, rowvar=False)
-    
+
     # Slice the correlation matrix to get cross-correlations
     # cross_corr shape: (latent_dim, feat_dim)
     cross_corr = corr_matrix[:latent_dim, latent_dim:]
@@ -6013,7 +6585,6 @@ def top10_features_per_latent(
     return cross_corr, top_correlation_df
 
 
-
 ###################################
 # Plot reconstructed data
 ###################################
@@ -6021,7 +6592,7 @@ def top10_features_per_latent(
 def plot_recon(VAE_results, original_data):
     """
     Plots the reconstructed data against the original data for a specific modality.
-    
+
     Parameters:
         results_VAE (dict): Dictionary containing VAE results, including 'recon_data'.
         final_data (pd.DataFrame): DataFrame containing the original data.
@@ -6069,15 +6640,15 @@ def plot_recon(VAE_results, original_data):
 def get_latent_means(latent_output):
     """
     Extracts the latent means from the output of a VAE's encoder.
-    
+
     The latent_output can be in one of the following forms:
       - A tuple of (latent_means, latent_logvar)
       - A dictionary with key 'mean'
       - Directly the latent means as a NumPy array or tensor
-      
+
     Parameters:
     - latent_output: The output from the VAE encoder.
-    
+
     Returns:
     - A NumPy array containing the latent means.
     """
@@ -6100,29 +6671,29 @@ def get_latent_means(latent_output):
 def plot_latent_variance(latent_means):
     """
     Creates a scree plot for the latent variables of a VAE.
-    
+
     Parameters:
     - latent_means: A NumPy array of shape (num_samples, latent_dim) containing the latent means
       for all samples.
     """
     # Compute variance for each latent dimension (axis=0: across samples)
     variances = np.var(latent_means, axis=0)
-    
+
     # Normalize the variances to get a variance ratio similar to PCA explained variance
     explained_variance_ratio = variances / np.sum(variances)
-    
+
     # Compute cumulative variance for visualization
     cumulative_variance = np.cumsum(explained_variance_ratio)
-    
+
     latent_dim = len(explained_variance_ratio)
     plt.figure(figsize=(8, 5))
-    
+
     # Bar plot for individual variance ratios
     plt.bar(range(1, latent_dim + 1), explained_variance_ratio, alpha=0.6, label='Individual Variance Ratio')
-    
+
     # Line plot for cumulative variance
     plt.plot(range(1, latent_dim + 1), cumulative_variance, marker='o', color='r', label='Cumulative Variance')
-    
+
     plt.xlabel('Latent Variable Index')
     plt.ylabel('Variance Ratio')
     plt.title('Scree Plot for VAE Latent Variables')
@@ -6137,8 +6708,6 @@ def plot_latent_variance(latent_means):
 # plot_latent_variance(latent_means)
 
 
-   
-
 ###################################
 # Plot variance PCA
 ###################################
@@ -6148,16 +6717,16 @@ def plot_scree(pca):
     """
     num_components = len(pca.explained_variance_ratio_)
     plt.figure(figsize=(8, 5))
-    
+
     # Bar plot for each component's explained variance
-    plt.bar(range(1, num_components + 1), pca.explained_variance_ratio_, 
+    plt.bar(range(1, num_components + 1), pca.explained_variance_ratio_,
             alpha=0.6, color='b', label='Individual Explained Variance')
-    
+
     # Line plot for cumulative explained variance
     cumulative_variance = np.cumsum(pca.explained_variance_ratio_)
-    plt.plot(range(1, num_components + 1), cumulative_variance, 
+    plt.plot(range(1, num_components + 1), cumulative_variance,
              marker='o', color='r', label='Cumulative Explained Variance')
-    
+
     plt.xlabel('Principal Component')
     plt.ylabel('Explained Variance Ratio')
     plt.title('Scree Plot')
@@ -6176,7 +6745,7 @@ def plot_scree(pca):
 def biplot(pca, df_numeric, feature_names=None):
     """
     Creates a biplot for the first two principal components.
-    
+
     Parameters:
     - pca: A fitted PCA object.
     - df_numeric: The numeric dataframe used for PCA.
@@ -6185,29 +6754,29 @@ def biplot(pca, df_numeric, feature_names=None):
 
     columns_to_exclude = ['src_subject_id', 'interview_date']
     df_numeric = df_numeric.drop(columns=[col for col in columns_to_exclude if col in df_numeric.columns])
-        
+
 
     # Project the data onto the first two principal components
     scores = pca.transform(df_numeric)
-    
+
     if feature_names is None:
         feature_names = df_numeric.columns
-    
+
     plt.figure(figsize=(10, 8))
-    
+
     # Scatter plot of the projected data (scores)
     plt.scatter(scores[:, 0], scores[:, 1], alpha=0.6, edgecolor='k')
-    
+
     # Scale factor for the arrows to make them visible
     arrow_scale = 3.0
-    
+
     # Plot the loadings as arrows
     for i, (comp1, comp2) in enumerate(zip(pca.components_[0], pca.components_[1])):
-        plt.arrow(0, 0, comp1 * arrow_scale, comp2 * arrow_scale, 
+        plt.arrow(0, 0, comp1 * arrow_scale, comp2 * arrow_scale,
                   color='r', width=0.005, head_width=0.1)
-        plt.text(comp1 * arrow_scale * 1.15, comp2 * arrow_scale * 1.15, 
+        plt.text(comp1 * arrow_scale * 1.15, comp2 * arrow_scale * 1.15,
                  feature_names[i], color='r', ha='center', va='center')
-    
+
     plt.xlabel('PC1')
     plt.ylabel('PC2')
     plt.title('PCA Biplot')
@@ -6220,16 +6789,13 @@ def biplot(pca, df_numeric, feature_names=None):
 # biplot(pca, df_numeric)
 
 
-
-
-
 ###################################
 # Differences in latent var between groups
 ###################################
 
 def plot_cluster_latent(df):
     """
-    Plot the mean latent variable values for each cluster in a heatmap format. Input is the dict 
+    Plot the mean latent variable values for each cluster in a heatmap format. Input is the dict
     """
 
     # Compute mean latent variable values per cluster
@@ -6250,14 +6816,12 @@ def plot_cluster_latent(df):
     plt.show()
 
 
-
-
-
 ###################################
 # Plot parallel coordinates
 ###################################
 def plot_parallel_coordinates(df):
 
+    """Plot parallel coordinates."""
     for cluster_id in sorted(df["Cluster"].unique()):
         subset = df[df["Cluster"] == cluster_id]
         plt.plot(subset.drop(columns=["Cluster"]).T, alpha=0.3)  # Transpose to align variables on x-axis
@@ -6269,15 +6833,13 @@ def plot_parallel_coordinates(df):
     plt.show()
 
 
-
-
-
 ###################################
 # Plot heatmap of means of original variables per cluster
 ###################################
 
 def plot_cluster_original(df):
     # Compute means per cluster
+    """Plot cluster original."""
     means = df.groupby('Cluster').mean()
 
     # Create the figure with a larger size
@@ -6330,6 +6892,7 @@ def get_modality_columns_for_dummy_coding(
 
 
 def _collinearity_pair_level(abs_r):
+    """Handle collinearity pair level."""
     if pd.isna(abs_r):
         return np.nan
     if abs_r >= 0.90:
@@ -6342,6 +6905,7 @@ def _collinearity_pair_level(abs_r):
 
 
 def _collinearity_vif_level(vif):
+    """Handle collinearity vif level."""
     if pd.isna(vif):
         return np.nan
     if np.isinf(vif) or vif >= 10:
@@ -6354,6 +6918,7 @@ def _collinearity_vif_level(vif):
 
 
 def _collinearity_condition_level(condition_index):
+    """Handle collinearity condition level."""
     if pd.isna(condition_index):
         return np.nan
     if np.isinf(condition_index) or condition_index >= 30:
@@ -6364,6 +6929,7 @@ def _collinearity_condition_level(condition_index):
 
 
 def _prepare_collinearity_matrix(data, variables, min_pairwise_n=3):
+    """Prepare collinearity matrix."""
     matrix = data[variables].apply(pd.to_numeric, errors="coerce")
     valid_variables = [
         column for column in matrix.columns
@@ -6383,6 +6949,7 @@ def _prepare_collinearity_matrix(data, variables, min_pairwise_n=3):
 
 
 def _compute_collinearity_vif(matrix, domain_name):
+    """Calculate collinearity vif."""
     if matrix.shape[1] < 2:
         return []
 
@@ -6425,6 +6992,7 @@ def _compute_collinearity_vif(matrix, domain_name):
 
 
 def _compute_collinearity_condition_index(matrix):
+    """Calculate collinearity condition index."""
     if matrix.shape[1] < 2:
         return np.nan, np.nan, np.nan
 
@@ -7647,7 +8215,6 @@ def plot_cluster_change_over_time(
     return figs
 
 
-
 import pandas as pd
 
 def align_month2_dicts_to_clustering_features(
@@ -7940,8 +8507,12 @@ def apply_preprocessing_to_month2(
 
 
 def _save_longitudinal_matplotlib_image(fig, png_path, **savefig_kwargs):
-    """Save a longitudinal matplotlib figure as PNG and fully editable SVG."""
+    """Save a longitudinal matplotlib figure as PNG, PDF, and fully editable SVG."""
     fig.savefig(png_path, **savefig_kwargs)
+    pdf_path = os.path.splitext(png_path)[0] + ".pdf"
+    pdf_kwargs = dict(savefig_kwargs)
+    pdf_kwargs.pop("dpi", None)
+    fig.savefig(pdf_path, format="pdf", **pdf_kwargs)
     svg_path = os.path.splitext(png_path)[0] + ".svg"
     svg_kwargs = dict(savefig_kwargs)
     svg_kwargs.pop("dpi", None)
@@ -7954,7 +8525,7 @@ def _save_longitudinal_matplotlib_image(fig, png_path, **savefig_kwargs):
         "svg.hashsalt": "",
     }):
         fig.savefig(svg_path, format="svg", **svg_kwargs)
-    return {"png": png_path, "svg": svg_path}
+    return {"png": png_path, "pdf": pdf_path, "svg": svg_path}
 
 
 def find_longitudinal_month_files(
@@ -8001,6 +8572,7 @@ def find_longitudinal_month_files(
 
 
 def _read_longitudinal_months(month_files, categorical_columns=None):
+    """Read longitudinal months."""
     data_by_month = {}
     categorical_columns = list(categorical_columns or [])
     for month, path in sorted(month_files.items()):
@@ -8041,6 +8613,7 @@ def _apply_longitudinal_followup_aliases(df, expected_features=None):
 
 
 def _merge_modalities_for_longitudinal(data_dict, subject_id_column="src_subject_id"):
+    """Merge modalities for longitudinal."""
     merged = None
     for modality, df in data_dict.items():
         if df is None or subject_id_column not in df.columns:
@@ -8133,6 +8706,7 @@ def _build_mixed_longitudinal_component_frames(
 
 
 def _has_non_numeric_longitudinal_features(df, subject_id_column="src_subject_id"):
+    """Handle has non numeric longitudinal features."""
     if df is None or df.empty:
         return False
     return any(
@@ -8173,6 +8747,7 @@ def _align_singleclust_longitudinal_frame(
     training_columns,
     subject_id_column="src_subject_id",
 ):
+    """Handle align singleclust longitudinal frame."""
     if frame is None or not isinstance(frame, pd.DataFrame) or subject_id_column not in frame.columns:
         return pd.DataFrame(columns=[subject_id_column])
     present = [c for c in training_columns if c in frame.columns]
@@ -8188,6 +8763,7 @@ def _longitudinal_raw_vars_to_keep(
     subject_id_column="src_subject_id",
     phenotype_col="phenotype",
 ):
+    """Handle longitudinal raw vars to keep."""
     vars_to_keep = []
     if isinstance(preprocessing_details, dict):
         feature_columns_per_modality = preprocessing_details.get("feature_columns_per_modality", {}) or {}
@@ -8204,23 +8780,132 @@ def _longitudinal_raw_vars_to_keep(
     return clean
 
 
+def _longitudinal_raw_available_training_columns(
+    raw_df,
+    training_columns,
+    raw_training_columns=None,
+    subject_id_column="src_subject_id",
+    min_nonmissing=1,
+):
+    """Handle longitudinal raw available training columns."""
+    if raw_df is None or raw_df.empty:
+        return []
+    available = []
+    raw_columns = set(raw_df.columns)
+    raw_training_columns = [
+        c for c in (raw_training_columns or [])
+        if isinstance(c, str) and c != subject_id_column
+    ]
+    raw_training_set = set(raw_training_columns)
+    for column in training_columns:
+        candidates = []
+        if isinstance(column, str):
+            candidates.append(column.split("__", 1)[1] if "__" in column else column)
+            candidates.append(column)
+            for raw_name in raw_training_columns:
+                if column == raw_name or column.startswith(f"{raw_name}_") or column.startswith(f"{raw_name}__"):
+                    candidates.append(raw_name)
+        candidates = list(dict.fromkeys(c for c in candidates if c in raw_training_set or c in raw_columns))
+        raw_name = next((c for c in candidates if c in raw_columns), None)
+        if raw_name is None:
+            continue
+        if raw_df[raw_name].notna().sum() >= min_nonmissing:
+            available.append(column)
+    return available
+
+
+def _longitudinal_training_to_raw_feature_map(
+    raw_df,
+    training_columns,
+    raw_training_columns=None,
+    subject_id_column="src_subject_id",
+):
+    """Handle longitudinal training to raw feature map."""
+    if raw_df is None or raw_df.empty:
+        return {}
+    raw_columns = set(raw_df.columns)
+    raw_training_columns = [
+        c for c in (raw_training_columns or [])
+        if isinstance(c, str) and c != subject_id_column
+    ]
+    raw_training_set = set(raw_training_columns)
+    mapping = {}
+    for column in training_columns:
+        candidates = []
+        if isinstance(column, str):
+            candidates.append(column.split("__", 1)[1] if "__" in column else column)
+            candidates.append(column)
+            for raw_name in raw_training_columns:
+                if column == raw_name or column.startswith(f"{raw_name}_") or column.startswith(f"{raw_name}__"):
+                    candidates.append(raw_name)
+        candidates = list(dict.fromkeys(c for c in candidates if c in raw_training_set or c in raw_columns))
+        raw_name = next((c for c in candidates if c in raw_columns), None)
+        if raw_name is not None:
+            mapping[column] = raw_name
+    return mapping
+
+
+def _longitudinal_followup_availability(
+    raw_df,
+    training_columns,
+    raw_training_columns=None,
+    subject_id_column="src_subject_id",
+    col_threshold=0.5,
+    row_threshold=0.5,
+):
+    """
+    Apply baseline-style raw missingness filtering to one follow-up sample/domain.
+
+    Columns survive when their raw follow-up missing fraction is <= col_threshold.
+    Rows survive when their raw missing fraction across surviving columns is
+    <= row_threshold. Imputation happens later, after this raw-data gate.
+    """
+    if raw_df is None or raw_df.empty:
+        return [], [], []
+    feature_map = _longitudinal_training_to_raw_feature_map(
+        raw_df,
+        training_columns,
+        raw_training_columns=raw_training_columns,
+        subject_id_column=subject_id_column,
+    )
+    if not feature_map:
+        return [], [], []
+
+    n_rows = len(raw_df)
+    min_nonmissing_col = int(np.ceil((1 - col_threshold) * n_rows))
+    kept_pairs = []
+    for training_col, raw_col in feature_map.items():
+        if raw_df[raw_col].notna().sum() >= min_nonmissing_col:
+            kept_pairs.append((training_col, raw_col))
+
+    if not kept_pairs:
+        return [], [], []
+
+    kept_training = [training_col for training_col, _ in kept_pairs]
+    kept_raw = list(dict.fromkeys(raw_col for _, raw_col in kept_pairs))
+    raw_matrix = raw_df[kept_raw]
+    min_nonmissing_row = int(np.ceil((1 - row_threshold) * len(kept_raw)))
+    row_mask = raw_matrix.notna().sum(axis=1) >= min_nonmissing_row
+    if subject_id_column in raw_df.columns:
+        eligible_subject_ids = raw_df.loc[row_mask, subject_id_column].astype(str).tolist()
+    else:
+        eligible_subject_ids = raw_df.index[row_mask].astype(str).tolist()
+    return kept_training, kept_raw, eligible_subject_ids
+
+
 def _singleclust_raw_available_training_columns(
     raw_df,
     training_columns,
     subject_id_column="src_subject_id",
     min_nonmissing=1,
 ):
-    if raw_df is None or raw_df.empty:
-        return []
-    available = []
-    raw_columns = set(raw_df.columns)
-    for column in training_columns:
-        raw_name = column.split("__", 1)[1] if "__" in column else column
-        if raw_name not in raw_columns:
-            continue
-        if raw_df[raw_name].notna().sum() >= min_nonmissing:
-            available.append(column)
-    return available
+    """Handle singleclust raw available training columns."""
+    return _longitudinal_raw_available_training_columns(
+        raw_df,
+        training_columns,
+        subject_id_column=subject_id_column,
+        min_nonmissing=min_nonmissing,
+    )
 
 
 def _labels_from_final_metrics(
@@ -8231,6 +8916,7 @@ def _labels_from_final_metrics(
     validation_subject_ids=None,
     validation_baseline_data=None,
 ):
+    """Handle labels from final metrics."""
     labels = {"discovery": {}, "validation": {}}
     data_dict = final_metrics.get("data", {})
     if isinstance(data_dict, pd.DataFrame):
@@ -8301,6 +8987,7 @@ def _build_longitudinal_label_df(
     min_followup_timepoints_per_feature=1,
     min_nonmissing_per_timepoint=8,
 ):
+    """Build longitudinal label df."""
     labels_use = labels_df[[subject_id_column, "label"]].dropna().drop_duplicates(subject_id_column).copy()
     labels_use[subject_id_column] = labels_use[subject_id_column].astype(str)
 
@@ -8435,21 +9122,51 @@ def _run_mean_drift_sensitivity(
             "overall_baseline_mean": overall_baseline_mean,
         }
 
+        def _wald_term_values(result, term_name):
+            """Handle wald term values."""
+            try:
+                term_table = result.wald_test_terms(skip_single=False).table
+            except Exception:
+                return np.nan, np.nan, np.nan
+            if term_name not in term_table.index:
+                return np.nan, np.nan, np.nan
+            row = term_table.loc[term_name]
+            statistic = row.get("statistic", np.nan)
+            if hasattr(statistic, "item"):
+                statistic = statistic.item()
+            p_value = row.get("pvalue", np.nan)
+            if hasattr(p_value, "item"):
+                p_value = p_value.item()
+            df_constraint = row.get("df_constraint", np.nan)
+            if hasattr(df_constraint, "item"):
+                df_constraint = df_constraint.item()
+            return float(statistic), float(p_value), float(df_constraint)
+
         try:
-            full = smf.mixedlm(
+            adjusted = smf.mixedlm(
                 "value ~ baseline_value + C(group) * C(time)",
                 follow,
                 groups=follow[subject_id_column],
-            ).fit(reml=False, method="lbfgs", disp=False)
-            no_interaction = smf.mixedlm(
-                "value ~ baseline_value + C(group) + C(time)",
-                follow,
-                groups=follow[subject_id_column],
-            ).fit(reml=False, method="lbfgs", disp=False)
-            lr = max(0.0, 2.0 * (full.llf - no_interaction.llf))
-            df_diff = max(1, int(full.df_modelwc - no_interaction.df_modelwc))
-            row_base["baseline_adjusted_interaction_lr"] = lr
-            row_base["baseline_adjusted_interaction_p"] = float(chi2.sf(lr, df_diff))
+            ).fit(reml=False, method="lbfgs", disp=False, maxiter=200)
+            baseline_wald, baseline_p, baseline_df = _wald_term_values(adjusted, "baseline_value")
+            group_wald, group_p, group_df = _wald_term_values(adjusted, "C(group)")
+            time_wald, time_p, time_df = _wald_term_values(adjusted, "C(time)")
+            interaction_wald, interaction_p, interaction_df = _wald_term_values(adjusted, "C(group):C(time)")
+            row_base.update({
+                "baseline_adjusted_test_type": "mixedlm_wald_terms",
+                "baseline_adjusted_baseline_wald_chi2": baseline_wald,
+                "baseline_adjusted_baseline_df": baseline_df,
+                "baseline_adjusted_baseline_p": baseline_p,
+                "baseline_adjusted_group_wald_chi2": group_wald,
+                "baseline_adjusted_group_df": group_df,
+                "baseline_adjusted_group_p": group_p,
+                "baseline_adjusted_time_wald_chi2": time_wald,
+                "baseline_adjusted_time_df": time_df,
+                "baseline_adjusted_time_p": time_p,
+                "baseline_adjusted_interaction_wald_chi2": interaction_wald,
+                "baseline_adjusted_interaction_df": interaction_df,
+                "baseline_adjusted_interaction_p": interaction_p,
+            })
         except Exception as exc:
             row_base["baseline_adjusted_model_error"] = str(exc)
 
@@ -8486,7 +9203,12 @@ def _run_mean_drift_sensitivity(
         rows.append(row_base)
 
     out = pd.DataFrame(rows)
-    for col in ["baseline_adjusted_interaction_p", "change_score_interaction_p"]:
+    for col in [
+        "baseline_adjusted_group_p",
+        "baseline_adjusted_time_p",
+        "baseline_adjusted_interaction_p",
+        "change_score_interaction_p",
+    ]:
         if col in out.columns:
             ok = out[col].notna()
             out[f"{col}_fdr"] = np.nan
@@ -8495,8 +9217,9 @@ def _run_mean_drift_sensitivity(
     if not out.empty:
         sort_cols = [
             c for c in [
-                "baseline_adjusted_interaction_p_fdr",
                 "change_score_interaction_p_fdr",
+                "baseline_adjusted_interaction_p_fdr",
+                "change_score_interaction_p",
                 "baseline_adjusted_interaction_p",
             ]
             if c in out.columns
@@ -8516,6 +9239,7 @@ def _run_mean_drift_sensitivity(
 
     if plot_features:
         def group_sort(value):
+            """Handle group sort."""
             try:
                 return (0, float(value))
             except Exception:
@@ -8796,6 +9520,7 @@ def run_longitudinal_mixed_models(
     ok_features = all_ok_features[:top_n_plot]
     if all_ok_features:
         def format_fdr_effect(label, p_value):
+            """Format fdr effect."""
             if pd.isna(p_value):
                 return f"{label}: q=NA"
             if p_value < 0.001:
@@ -8809,6 +9534,7 @@ def run_longitudinal_mixed_models(
             return f"{label}: q={p_value:.3g} {stars}"
 
         def plot_feature_grid(feature_list, output_path, dpi=300):
+            """Plot feature grid."""
             ncols = min(3, len(feature_list))
             nrows = int(np.ceil(len(feature_list) / ncols))
             fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(5.4 * ncols, 4.25 * nrows), squeeze=False)
@@ -8986,6 +9712,7 @@ def plot_cluster_membership_sankey_over_time(
         stage_labels[f"month{month}"] = f"Month {month}<br>n={n_subjects}{feature_text}"
 
     def sort_label_key(label):
+        """Handle sort label key."""
         label = str(label)
         try:
             return (0, float(label))
@@ -9007,6 +9734,7 @@ def plot_cluster_membership_sankey_over_time(
     color_map = modality_cluster_palette(cluster_order)
 
     def rgba_from_hex(hex_color, alpha=0.55):
+        """Handle rgba from hex."""
         hex_color = str(hex_color).lstrip("#")
         if len(hex_color) != 6:
             return "rgba(120,120,120,0.45)"
@@ -9030,6 +9758,7 @@ def plot_cluster_membership_sankey_over_time(
     node_y = []
 
     def add_node(stage, cluster):
+        """Add node."""
         key = (stage, str(cluster))
         if key in node_index:
             return node_index[key]
@@ -9126,9 +9855,12 @@ def plot_cluster_membership_sankey_over_time(
         try:
             png_path = os.path.join(output_dir, f"{prefix}_sankey_over_time.png")
             fig.write_image(png_path, scale=2)
+            pdf_path = os.path.splitext(png_path)[0] + ".pdf"
+            fig.write_image(pdf_path, scale=2)
             svg_path = os.path.splitext(png_path)[0] + ".svg"
             fig.write_image(svg_path)
             paths["png"] = png_path
+            paths["pdf"] = pdf_path
             paths["svg"] = svg_path
         except Exception:
             pass
@@ -9422,14 +10154,18 @@ def run_longitudinal_multiclust_report(
     min_features_for_cluster_change=1,
     min_followup_timepoints_per_feature=1,
     min_nonmissing_per_timepoint=8,
+    followup_col_threshold=0.5,
+    followup_row_threshold=0.5,
     min_group_n=4,
     reuse_existing=True,
+    skip_model_fits=False,
 ):
     """
     Run longitudinal postprocessing for discovery and validation samples.
 
-    The analysis uses baseline cluster labels, applies the baseline preprocessing
-    to all available months, filters sparse month/feature combinations, fits
+    The analysis uses baseline cluster labels, applies baseline feature-space
+    decisions to all available months, filters raw follow-up variables/rows with
+    baseline-style missingness thresholds before timepoint-local imputation, fits
     mixed models over baseline plus months 1-5, and summarizes how follow-up
     observations map back onto baseline cluster centroids.
     """
@@ -9486,47 +10222,59 @@ def run_longitudinal_multiclust_report(
         for month, df in month_map.items():
             if df.empty:
                 continue
-            try:
-                _, _, dict_month = apply_preprocessing_to_month2(
-                    df=df,
-                    meta=meta,
-                    preprocessing_details=preprocessing_details,
-                    subject_id_column=subject_id_column,
-                    imputation_mode="reference",
-                    align_modalities=False,
-                )
-            except Exception as exc:
-                reports.append({
-                    "sample": sample,
-                    "month": month,
-                    "modality": "<all>",
-                    "n_training_features": np.nan,
-                    "n_features_available": np.nan,
-                    "status": f"preprocessing_failed: {exc}",
-                })
-                continue
             aligned = {}
             if is_singleclust_data:
                 analysis_name, baseline_df = next(iter(baseline_data_by_analysis.items()))
                 training_cols = [c for c in baseline_df.columns if c != subject_id_column]
-                raw_available_training_cols = _singleclust_raw_available_training_columns(
+                raw_available_training_cols, raw_available_vars, eligible_subject_ids = _longitudinal_followup_availability(
                     df,
                     training_cols,
                     subject_id_column=subject_id_column,
-                    min_nonmissing=min_nonmissing_per_timepoint,
+                    col_threshold=followup_col_threshold,
+                    row_threshold=followup_row_threshold,
                 )
-                merged_month = _merge_modalities_for_longitudinal(dict_month, subject_id_column=subject_id_column)
-                present = [c for c in raw_available_training_cols if c in merged_month.columns]
-                observed = [
-                    c for c in present
-                    if not merged_month[c].isna().all()
-                ]
-                if len(observed) >= min_features_per_analysis:
-                    aligned[analysis_name] = merged_month[[subject_id_column] + observed].copy()
+                present = []
+                observed = []
+                preprocessing_status = None
+                if len(raw_available_training_cols) >= min_features_per_analysis and eligible_subject_ids:
+                    keep_cols = [subject_id_column] + [c for c in raw_available_vars if c in df.columns]
+                    df_use = df.loc[
+                        df[subject_id_column].astype(str).isin(set(eligible_subject_ids)),
+                        keep_cols,
+                    ].copy()
+                    try:
+                        _, _, dict_month = apply_preprocessing_to_month2(
+                            df=df_use,
+                            meta=meta,
+                            preprocessing_details=preprocessing_details,
+                            subject_id_column=subject_id_column,
+                            imputation_mode="independent",
+                            align_modalities=False,
+                        )
+                        merged_month = _merge_modalities_for_longitudinal(dict_month, subject_id_column=subject_id_column)
+                        present = [c for c in raw_available_training_cols if c in merged_month.columns]
+                        observed = [
+                            c for c in present
+                            if not merged_month[c].isna().all()
+                        ]
+                        if len(observed) >= min_features_per_analysis:
+                            month_use = merged_month[[subject_id_column] + observed].copy()
+                            if not month_use.empty:
+                                aligned[analysis_name] = month_use
+                    except Exception as exc:
+                        preprocessing_status = f"preprocessing_failed: {exc}"
                 status = (
                     "kept"
-                    if len(observed) >= min_features_per_analysis
-                    else "dropped_too_few_raw_observed_features"
+                    if analysis_name in aligned
+                    else (
+                        preprocessing_status
+                        if preprocessing_status is not None
+                        else (
+                            "dropped_no_rows_after_raw_missingness"
+                            if len(raw_available_training_cols) >= min_features_per_analysis
+                            else "dropped_too_few_raw_observed_features"
+                        )
+                    )
                 )
                 reports.append({
                     "sample": sample,
@@ -9536,20 +10284,62 @@ def run_longitudinal_multiclust_report(
                     "n_features_available": len(observed),
                     "n_features_aligned": len(present),
                     "n_raw_features_available": len(raw_available_training_cols),
+                    "n_raw_variables_available": len(raw_available_vars),
+                    "n_rows_passing_raw_missingness": len(eligible_subject_ids),
+                    "followup_col_threshold": followup_col_threshold,
+                    "followup_row_threshold": followup_row_threshold,
+                    "imputation_mode": "independent",
+                    "imputation_fit_scope": "followup_timepoint_after_raw_missingness_filter",
                     "status": status,
                 })
             else:
                 for modality, baseline_df in baseline_data_by_analysis.items():
-                    if modality not in dict_month:
-                        continue
                     training_cols = [c for c in baseline_df.columns if c != subject_id_column]
-                    present = [c for c in training_cols if c in dict_month[modality].columns]
-                    observed = [
-                        c for c in present
-                        if not dict_month[modality][c].isna().all()
-                    ]
-                    if len(observed) >= min_features_per_analysis:
-                        aligned[modality] = dict_month[modality][[subject_id_column] + observed].copy()
+                    raw_training_cols = (
+                        preprocessing_details.get("feature_columns_per_modality", {}) or {}
+                    ).get(modality, training_cols)
+                    raw_available_training_cols, raw_available_vars, eligible_subject_ids = _longitudinal_followup_availability(
+                        df,
+                        training_cols,
+                        raw_training_columns=raw_training_cols,
+                        subject_id_column=subject_id_column,
+                        col_threshold=followup_col_threshold,
+                        row_threshold=followup_row_threshold,
+                    )
+                    present = []
+                    observed = []
+                    kept = False
+                    preprocessing_status = None
+                    if len(raw_available_training_cols) >= min_features_per_analysis and eligible_subject_ids:
+                        keep_cols = [subject_id_column] + [c for c in raw_available_vars if c in df.columns]
+                        df_use = df.loc[
+                            df[subject_id_column].astype(str).isin(set(eligible_subject_ids)),
+                            keep_cols,
+                        ].copy()
+                        try:
+                            _, _, dict_month = apply_preprocessing_to_month2(
+                                df=df_use,
+                                meta=meta,
+                                preprocessing_details=preprocessing_details,
+                                subject_id_column=subject_id_column,
+                                imputation_mode="independent",
+                                align_modalities=False,
+                            )
+                            if modality in dict_month:
+                                present = [c for c in raw_available_training_cols if c in dict_month[modality].columns]
+                                observed = [
+                                    c for c in present
+                                    if not dict_month[modality][c].isna().all()
+                                ]
+                                if len(observed) >= min_features_per_analysis:
+                                    month_use = dict_month[modality][[subject_id_column] + observed].copy()
+                                    if not month_use.empty:
+                                        aligned[modality] = month_use
+                                        kept = True
+                            else:
+                                preprocessing_status = "preprocessing_failed: modality absent after preprocessing"
+                        except Exception as exc:
+                            preprocessing_status = f"preprocessing_failed: {exc}"
                     reports.append({
                         "sample": sample,
                         "month": month,
@@ -9557,7 +10347,22 @@ def run_longitudinal_multiclust_report(
                         "n_training_features": len(training_cols),
                         "n_features_available": len(observed),
                         "n_features_aligned": len(present),
-                        "status": "kept" if len(observed) >= min_features_per_analysis else "dropped_too_few_observed_features",
+                        "n_raw_features_available": len(raw_available_training_cols),
+                        "n_raw_variables_available": len(raw_available_vars),
+                        "n_rows_passing_raw_missingness": len(eligible_subject_ids),
+                        "followup_col_threshold": followup_col_threshold,
+                        "followup_row_threshold": followup_row_threshold,
+                        "imputation_mode": "independent",
+                        "imputation_fit_scope": "followup_timepoint_after_raw_missingness_filter",
+                        "status": "kept" if kept else (
+                            preprocessing_status
+                            if preprocessing_status is not None
+                            else (
+                                "dropped_no_rows_after_raw_missingness"
+                                if len(raw_available_training_cols) >= min_features_per_analysis
+                                else "dropped_too_few_raw_observed_features"
+                            )
+                        ),
                     })
             if aligned:
                 if not is_singleclust_data:
@@ -9572,6 +10377,12 @@ def run_longitudinal_multiclust_report(
         "n_features_available",
         "n_features_aligned",
         "n_raw_features_available",
+        "n_raw_variables_available",
+        "n_rows_passing_raw_missingness",
+        "followup_col_threshold",
+        "followup_row_threshold",
+        "imputation_mode",
+        "imputation_fit_scope",
         "status",
     ]
     report_df = pd.DataFrame(reports)
@@ -9684,28 +10495,54 @@ def run_longitudinal_multiclust_report(
                     subject_id_column=subject_id_column,
                     component_name="mixed_component1",
                 )
-            mixed = run_longitudinal_mixed_models(
-                baseline_df=analysis_baseline_df,
-                followup_by_month=analysis_followups,
-                labels_df=labels_df,
-                output_dir=os.path.join(analysis_out, "mixedlm"),
-                analysis_name=f"{sample}_{analysis_name}",
-                subject_id_column=subject_id_column,
-                min_followup_timepoints_per_feature=min_followup_timepoints_per_feature,
-                min_nonmissing_per_timepoint=min_nonmissing_per_timepoint,
-                min_group_n=min_group_n,
-                reuse_existing=reuse_existing,
-            )
-            change = analyze_cluster_change_across_time(
-                baseline_df=analysis_baseline_df,
-                followup_by_month=analysis_followups,
-                labels_df=labels_df,
-                output_dir=os.path.join(analysis_out, "cluster_membership_change"),
-                analysis_name=f"{sample}_{analysis_name}",
-                subject_id_column=subject_id_column,
-                min_features=min_features_for_cluster_change,
-                reuse_existing=reuse_existing,
-            )
+            if skip_model_fits:
+                long_df, features, feature_months = _build_longitudinal_label_df(
+                    baseline_df=analysis_baseline_df,
+                    followup_by_month=analysis_followups,
+                    labels_df=labels_df,
+                    subject_id_column=subject_id_column,
+                    min_followup_timepoints_per_feature=min_followup_timepoints_per_feature,
+                    min_nonmissing_per_timepoint=min_nonmissing_per_timepoint,
+                )
+                mixed = {
+                    "summary": pd.DataFrame(),
+                    "long_df": long_df,
+                    "features": features,
+                    "feature_months": feature_months,
+                    "cached": False,
+                    "skipped_model_fits": True,
+                }
+                change = {
+                    "summary": pd.DataFrame(),
+                    "paired_df": pd.DataFrame(),
+                    "transition_tables": {},
+                    "plot_paths": {},
+                    "cached": False,
+                    "skipped_model_fits": True,
+                }
+            else:
+                mixed = run_longitudinal_mixed_models(
+                    baseline_df=analysis_baseline_df,
+                    followup_by_month=analysis_followups,
+                    labels_df=labels_df,
+                    output_dir=os.path.join(analysis_out, "mixedlm"),
+                    analysis_name=f"{sample}_{analysis_name}",
+                    subject_id_column=subject_id_column,
+                    min_followup_timepoints_per_feature=min_followup_timepoints_per_feature,
+                    min_nonmissing_per_timepoint=min_nonmissing_per_timepoint,
+                    min_group_n=min_group_n,
+                    reuse_existing=reuse_existing,
+                )
+                change = analyze_cluster_change_across_time(
+                    baseline_df=analysis_baseline_df,
+                    followup_by_month=analysis_followups,
+                    labels_df=labels_df,
+                    output_dir=os.path.join(analysis_out, "cluster_membership_change"),
+                    analysis_name=f"{sample}_{analysis_name}",
+                    subject_id_column=subject_id_column,
+                    min_features=min_features_for_cluster_change,
+                    reuse_existing=reuse_existing,
+                )
             results["analyses"][(sample, analysis_name)] = {"mixedlm": mixed, "cluster_change": change}
             mixed_summary = mixed.get("summary", pd.DataFrame())
             change_summary = change.get("summary", pd.DataFrame())
@@ -9796,6 +10633,7 @@ def run_longitudinal_multiclust_report(
 
 
 def _dedupe_singleclust_longitudinal_summary(analysis_summary):
+    """Handle dedupe singleclust longitudinal summary."""
     if analysis_summary is None or analysis_summary.empty or "analysis" not in analysis_summary.columns:
         return analysis_summary
     analyses = set(analysis_summary["analysis"].dropna().astype(str))
@@ -9893,3 +10731,7938 @@ def display_longitudinal_multiclust_results(
             if isinstance(html_path, str) and html_path and os.path.exists(html_path):
                 display(HTML(filename=html_path))
         shown += 1
+
+# -----------------------------------------------------------------------------
+# Notebook helper binding
+# -----------------------------------------------------------------------------
+
+_ACTIVE_NOTEBOOK_GLOBALS = None
+
+
+def register_notebook_context(notebook_globals):
+    """Register the variables used by project-specific notebook helpers."""
+    global _ACTIVE_NOTEBOOK_GLOBALS
+    _ACTIVE_NOTEBOOK_GLOBALS = notebook_globals
+
+def _bind_notebook_function(function, notebook_globals, *, name=None):
+    """Bind a shared helper to a notebook's variables and imported packages."""
+    import functools
+    import types
+
+    rebound = types.FunctionType(
+        function.__code__,
+        notebook_globals,
+        name or function.__name__,
+        function.__defaults__,
+        function.__closure__,
+    )
+    rebound.__kwdefaults__ = function.__kwdefaults__
+    rebound.__annotations__ = dict(function.__annotations__)
+    functools.update_wrapper(rebound, function)
+    if name is not None:
+        rebound.__name__ = name
+        rebound.__qualname__ = name
+    return rebound
+
+
+def _with_notebook_context(function=None, *, default_expressions=None):
+    """Run a shared analysis helper with the calling notebook's variables."""
+    import functools
+    import inspect
+
+    def decorate(helper):
+        @functools.wraps(helper)
+        def wrapped(*args, **kwargs):
+            caller_globals = _ACTIVE_NOTEBOOK_GLOBALS
+            if caller_globals is None:
+                caller_globals = inspect.currentframe().f_back.f_globals
+            if default_expressions:
+                supplied = inspect.signature(helper).bind_partial(*args, **kwargs).arguments
+                for parameter, expression in default_expressions.items():
+                    if parameter not in supplied:
+                        kwargs[parameter] = eval(expression, caller_globals)
+            rebound = _bind_notebook_function(helper, caller_globals, name=helper.__name__)
+            return rebound(*args, **kwargs)
+
+        return wrapped
+
+    return decorate(function) if function is not None else decorate
+
+# -----------------------------------------------------------------------------
+# Simpleclust analysis helpers
+# Implementations are preserved from the original notebook cells.
+# -----------------------------------------------------------------------------
+
+@_with_notebook_context
+def simpleclust_extract_fold_number(fold_name):
+    """Process simpleclust extract fold number."""
+    digits = ''.join(ch for ch in str(fold_name) if ch.isdigit())
+    return int(digits) if digits else fold_name
+
+
+@_with_notebook_context
+def simpleclust_mode_value(series):
+    """Process simpleclust mode value."""
+    series = series.dropna()
+    if series.empty:
+        return None
+    if series.apply(lambda x: isinstance(x, (list, tuple))).any():
+        expanded = pd.DataFrame(series.tolist())
+        return expanded.mode(dropna=True).iloc[0].tolist()
+    mode = series.mode(dropna=True)
+    return mode.iloc[0] if not mode.empty else series.iloc[0]
+
+
+@_with_notebook_context
+def simpleclust_safe_numeric(value):
+    """Process simpleclust safe numeric."""
+    if isinstance(value, (list, tuple, dict, pd.Series, pd.DataFrame, np.ndarray)):
+        return np.nan
+    try:
+        return float(value)
+    except Exception:
+        return np.nan
+
+
+@_with_notebook_context
+def simpleclust_summarise_feature_differences(final_metrics, top_k=10):
+    """Process simpleclust summarise feature differences."""
+    data = final_metrics.get('data')
+    labels = np.asarray(final_metrics.get('final_labels'))
+    if data is None or 'src_subject_id' not in data.columns:
+        return pd.DataFrame()
+
+    feature_df = data.drop(columns=['src_subject_id'], errors='ignore').select_dtypes(include=[np.number]).copy()
+    if feature_df.empty or len(labels) != len(feature_df) or pd.Series(labels).nunique() < 2:
+        return pd.DataFrame()
+
+    valid_cols = feature_df.columns[feature_df.nunique(dropna=False) > 1]
+    feature_df = feature_df.loc[:, valid_cols]
+    if feature_df.empty:
+        return pd.DataFrame()
+
+    f_vals, p_vals = f_classif(feature_df.fillna(feature_df.mean()), labels)
+    out = pd.DataFrame({
+        'feature': feature_df.columns,
+        'f_value': f_vals,
+        'p_value': p_vals,
+    })
+    out = out.replace([np.inf, -np.inf], np.nan).dropna(subset=['f_value'])
+    return out.sort_values(['f_value', 'p_value'], ascending=[False, True]).head(top_k).reset_index(drop=True)
+
+
+@_with_notebook_context
+def simpleclust_save_plot_png_svg(fig, output_stem, dpi=300):
+    """Process simpleclust save plot png svg."""
+    output_stem = Path(output_stem)
+    output_stem.parent.mkdir(parents=True, exist_ok=True)
+    saved_paths = []
+    for extension in ('png', 'svg'):
+        output_path = output_stem.with_suffix(f'.{extension}')
+        save_kwargs = {'bbox_inches': 'tight'}
+        if extension == 'png':
+            save_kwargs['dpi'] = dpi
+        fig.savefig(output_path, **save_kwargs)
+        saved_paths.append(output_path)
+        print('Saved plot to:', output_path)
+    return saved_paths
+
+
+@_with_notebook_context
+def simpleclust_plot_autoencoder_diagnostics(run_name, final_metrics, out_dir=None):
+    """Process simpleclust plot autoencoder diagnostics."""
+    ae_res = final_metrics.get('ae_res')
+    if not isinstance(ae_res, dict):
+        print(f'{run_name}: no ae_res payload found, skipping latent diagnostics.')
+        return
+    required = {'final_latent', 'all_true', 'all_pred'}
+    if not required.issubset(ae_res):
+        print(f'{run_name}: ae_res missing {sorted(required - set(ae_res))}, skipping latent diagnostics.')
+        return
+
+    test_latent = ae_res['final_latent']
+    X_true = np.asarray(ae_res['all_true']).ravel()
+    X_pred = np.asarray(ae_res['all_pred']).ravel()
+
+    fig = plt.figure(figsize=(6, 6))
+    plt.scatter(X_true, X_pred, alpha=0.35)
+    plt.xlabel('Original Data')
+    plt.ylabel('Reconstructed Data')
+    plt.title(f'{run_name}: Original vs Reconstructed Data')
+    min_val = min(np.nanmin(X_true), np.nanmin(X_pred))
+    max_val = max(np.nanmax(X_true), np.nanmax(X_pred))
+    plt.plot([min_val, max_val], [min_val, max_val], 'r--', linewidth=2)
+    plt.tight_layout()
+    if out_dir is not None:
+        simpleclust_save_plot_png_svg(fig, Path(out_dir) / f'{run_name}_autoencoder_reconstruction')
+    plt.show()
+
+    latent_arr = np.asarray(test_latent)
+    if latent_arr.ndim == 1:
+        latent_arr = latent_arr.reshape(-1, 1)
+
+    fig = plt.figure(figsize=(6, 4))
+    plt.hist(latent_arr.ravel(), bins=np.linspace(-2, 2, 50))
+    plt.title(f'{run_name}: Latent Distribution')
+    plt.tight_layout()
+    if out_dir is not None:
+        simpleclust_save_plot_png_svg(fig, Path(out_dir) / f'{run_name}_latent_distribution')
+    plt.show()
+
+    if isinstance(test_latent, pd.DataFrame):
+        latent_df = test_latent.copy()
+    else:
+        latent_df = pd.DataFrame(latent_arr, columns=[f'z{i}' for i in range(latent_arr.shape[1])])
+
+    axes = scatter_matrix(latent_df, alpha=0.5, figsize=(8, 8), diagonal='hist')
+    plt.suptitle(f'{run_name}: Pairwise Latent Scatter Plots')
+    plt.tight_layout()
+    if out_dir is not None:
+        simpleclust_save_plot_png_svg(axes[0, 0].figure, Path(out_dir) / f'{run_name}_latent_scatter_matrix')
+    plt.show()
+
+
+@_with_notebook_context
+def notebook_profile_value_is_enabled(value):
+    """Process simpleclust truthy profile value."""
+    return str(value).strip().strip('"\'').upper() in {"TRUE", "1", "YES", "Y"}
+
+
+@_with_notebook_context
+def read_notebook_run_profile_exports(profile_path):
+    """Process simpleclust parse profile exports."""
+    exports = {}
+    if profile_path is None or not profile_path.exists():
+        return exports
+    for line in profile_path.read_text().splitlines():
+        line = line.strip()
+        if not line.startswith("export ") or "=" not in line:
+            continue
+        key, value = line[len("export "):].split("=", 1)
+        value = value.strip()
+        # Keep literal defaults such as ${VAR:-0} as-is; simple quoted values are enough for the flag check.
+        exports[key.strip()] = value.strip('"\'')
+    return exports
+
+
+def infer_notebook_profile_from_settings(directory_profiles, *, environment_variable="RUN_PROFILE"):
+    """Infer a profile using an explicit directory map and environment fallback."""
+    notebook_dir = Path.cwd().name
+    directory_profile = directory_profiles.get(notebook_dir)
+    if directory_profile:
+        return directory_profile
+    environment_profile = os.environ.get(environment_variable, "")
+    return environment_profile or None
+
+
+@_with_notebook_context
+def simpleclust_infer_notebook_profile():
+    """Infer the Simpleclust profile using its original directory settings."""
+    return infer_notebook_profile_from_settings({
+        "clinical_paper": "clinical_paper",
+        "multiclust_extended": "multiclust_extended",
+        "prospect": "prospect",
+        "Simpleclust": "Simpleclust",
+    })
+
+
+@_with_notebook_context
+def find_multiclust_repository_root(start):
+    """Process simpleclust find repo root."""
+    start = Path(start).resolve()
+    for parent in [start] + list(start.parents):
+        if (parent / "run_profiles").is_dir() and (parent / "full_pipeline.py").exists():
+            return parent
+    return None
+
+
+@_with_notebook_context
+def get_cluster_sensitivity_profile_setting(repo_root, profile_name):
+    """Process simpleclust profile enabled for sensitivity."""
+    if not profile_name or repo_root is None:
+        return None, None
+    profile_path = repo_root / "run_profiles" / f"{profile_name}.sh"
+    exports = read_notebook_run_profile_exports(profile_path)
+    value = exports.get("DO_CLUSTER_VALIDATION_SENSITIVITY", "FALSE")
+    return notebook_profile_value_is_enabled(value), profile_path
+
+
+@_with_notebook_context
+def display_notebook_result(obj):
+    """Process simpleclust display if available."""
+    if "display" in globals():
+        display(obj)
+    else:
+        print(obj)
+
+
+@_with_notebook_context
+def get_nested_result_value(dct, path, default=np.nan):
+    """Process simpleclust get nested."""
+    cur = dct
+    for key in path:
+        if not isinstance(cur, dict) or key not in cur:
+            return default
+        cur = cur[key]
+    return cur
+
+
+@_with_notebook_context
+def summarize_cluster_sensitivity_results(results):
+    """Process simpleclust flatten sensitivity results."""
+    rows = []
+    for solution, payload in results.get("solutions", {}).items():
+        rows.append({
+            "solution": solution,
+            "kind": payload.get("kind"),
+            "observed_k": get_nested_result_value(payload, ["observed_quality", "k"]),
+            "observed_n": get_nested_result_value(payload, ["observed_quality", "n"]),
+            "observed_n_features": get_nested_result_value(payload, ["observed_quality", "n_features"]),
+            "observed_composite": get_nested_result_value(payload, ["observed_quality", "composite"]),
+            "observed_silhouette": get_nested_result_value(payload, ["observed_quality", "silhouette"]),
+            "observed_calinski_harabasz": get_nested_result_value(payload, ["observed_quality", "calinski_harabasz"]),
+            "observed_davies_bouldin": get_nested_result_value(payload, ["observed_quality", "davies_bouldin"]),
+            "k1_composite": get_nested_result_value(payload, ["uni_cluster_baseline", "quality", "composite"]),
+            "pc1_variance_explained": get_nested_result_value(payload, ["pc1_median_split", "pc1_variance_explained"]),
+            "pc1_median_composite": get_nested_result_value(payload, ["pc1_median_split", "quality", "composite"]),
+            "pc1_median_ari_with_observed": get_nested_result_value(payload, ["pc1_median_split", "ari_with_observed_labels"]),
+            "pc1_median_stability_ari": get_nested_result_value(payload, ["pc1_median_split", "bootstrap_stability", "mean_ari"]),
+            "pc1_median_stability_sd_ari": get_nested_result_value(payload, ["pc1_median_split", "bootstrap_stability", "sd_ari"]),
+            "dip_available": get_nested_result_value(payload, ["dip_test_pc1", "available"], default=False),
+            "dip_statistic_pc1": get_nested_result_value(payload, ["dip_test_pc1", "dip"]),
+            "dip_p_value_pc1": get_nested_result_value(payload, ["dip_test_pc1", "p_value"]),
+            "gap_selected_k_tibshirani": get_nested_result_value(payload, ["gap_statistic", "selected_k_tibshirani_rule"]),
+            "gap_selected_k_max_gap": get_nested_result_value(payload, ["gap_statistic", "selected_k_max_gap"]),
+            "sigclust_cluster_index": get_nested_result_value(payload, ["sigclust_approx", "observed_cluster_index"]),
+            "sigclust_p_value": get_nested_result_value(payload, ["sigclust_approx", "p_value"]),
+            "sigclust_null_mean_cluster_index": get_nested_result_value(payload, ["sigclust_approx", "null_mean_cluster_index"]),
+            "gaussian_null_p_quality": get_nested_result_value(payload, ["covariance_matched_gaussian_null", "p_quality_ge_observed_recluster"]),
+            "gaussian_null_p_stability": get_nested_result_value(payload, ["covariance_matched_gaussian_null", "p_stability_ge_observed_recluster"]),
+            "observed_recluster_stability_ari": get_nested_result_value(payload, ["covariance_matched_gaussian_null", "observed_recluster_stability", "mean_ari"]),
+            "gaussian_null_mean_stability_ari": get_nested_result_value(payload, ["covariance_matched_gaussian_null", "null_stability_mean_ari"]),
+            "gaussian_null_mean_quality": get_nested_result_value(payload, ["covariance_matched_gaussian_null", "null_quality_mean"]),
+        })
+    return pd.DataFrame(rows)
+
+
+def adjust_pvalues_benjamini_hochberg(p_values, *, coerce_numeric=False):
+    """Adjust p-values with BH-FDR while preserving the selected input policy."""
+    if coerce_numeric:
+        values = pd.to_numeric(pd.Series(p_values), errors="coerce")
+        output = pd.Series(np.nan, index=values.index, dtype=float)
+        valid = values.dropna()
+        if valid.empty:
+            return output
+        order = np.argsort(valid.values)
+        ranked_values = valid.values[order]
+        ranked_index = valid.index[order]
+        n_tests = len(valid)
+    else:
+        values = pd.Series(p_values, dtype="float64")
+        output = pd.Series(np.nan, index=values.index, dtype="float64")
+        valid = values.dropna()
+        if valid.empty:
+            return output
+        ranked = valid.sort_values()
+        ranked_values = ranked.to_numpy()
+        ranked_index = ranked.index
+        n_tests = float(len(ranked))
+
+    adjusted = ranked_values * n_tests / np.arange(1, len(ranked_values) + 1)
+    adjusted = np.minimum.accumulate(adjusted[::-1])[::-1]
+    output.loc[ranked_index] = np.clip(adjusted, 0, 1)
+    return output
+
+
+@_with_notebook_context
+def simpleclust_bh_fdr_original_features(p_values):
+    """Adjust original-feature p-values using the Simpleclust input policy."""
+    return adjust_pvalues_benjamini_hochberg(p_values, coerce_numeric=False)
+
+
+@_with_notebook_context
+def simpleclust_format_fdr_q(q_value):
+    """Process simpleclust format fdr q."""
+    if pd.isna(q_value):
+        return ""
+    if q_value < 0.001:
+        return "<0.001"
+    if q_value < 0.01:
+        return "<0.01"
+    if q_value < 0.05:
+        return "<0.05"
+    return f"{q_value:.2g}"
+
+
+@_with_notebook_context
+def simpleclust_cohens_d(values_a, values_b):
+    """Process simpleclust cohens d."""
+    values_a = pd.Series(values_a, dtype="float64").dropna()
+    values_b = pd.Series(values_b, dtype="float64").dropna()
+    n_a, n_b = len(values_a), len(values_b)
+    if n_a < 2 or n_b < 2:
+        return np.nan
+    var_a = values_a.var(ddof=1)
+    var_b = values_b.var(ddof=1)
+    pooled_var = ((n_a - 1) * var_a + (n_b - 1) * var_b) / (n_a + n_b - 2)
+    if not np.isfinite(pooled_var) or pooled_var <= 0:
+        return np.nan
+    return float((values_a.mean() - values_b.mean()) / np.sqrt(pooled_var))
+
+
+@_with_notebook_context
+def simpleclust_make_original_feature_pairwise_tests(chr_df, clusters, ranked_stats, subject_id_column="src_subject_id"):
+    """Process simpleclust make original feature pairwise tests."""
+    features = ranked_stats["feature"].drop_duplicates().tolist()
+    cluster_values = pd.Series(np.asarray(clusters).reshape(-1), name="group").astype(str)
+    group_order = sorted(cluster_values.dropna().unique().tolist())
+    rows = []
+
+    for feature_rank, feature in enumerate(features, start=1):
+        if feature not in chr_df.columns:
+            continue
+        chr_values = pd.to_numeric(chr_df[feature], errors="coerce")
+        plot_df = pd.DataFrame({"value": chr_values, "group": cluster_values}).dropna(subset=["value", "group"])
+        if plot_df.empty:
+            continue
+        for group_a, group_b in combinations(group_order, 2):
+            values_a = plot_df.loc[plot_df["group"].eq(group_a), "value"].dropna().astype(float)
+            values_b = plot_df.loc[plot_df["group"].eq(group_b), "value"].dropna().astype(float)
+            statistic, p_value = np.nan, np.nan
+            if len(values_a) > 0 and len(values_b) > 0:
+                try:
+                    statistic, p_value = mannwhitneyu(values_a, values_b, alternative="two-sided")
+                except ValueError:
+                    pass
+            rows.append({
+                "feature_rank": feature_rank,
+                "feature": feature,
+                "display_feature": display_feature_name(feature),
+                "comparison": f"{group_a} vs {group_b}",
+                "group_a": group_a,
+                "group_b": group_b,
+                "n_a": int(values_a.notna().sum()),
+                "n_b": int(values_b.notna().sum()),
+                "median_a": values_a.median() if len(values_a) else np.nan,
+                "median_b": values_b.median() if len(values_b) else np.nan,
+                "median_difference_a_minus_b": (
+                    values_a.median() - values_b.median() if len(values_a) and len(values_b) else np.nan
+                ),
+                "mann_whitney_u": statistic,
+                "effect_size": simpleclust_cohens_d(values_a, values_b),
+                "p_value": p_value,
+            })
+
+    out = pd.DataFrame(rows)
+    if not out.empty:
+        out["pairwise_q_value_fdr"] = simpleclust_bh_fdr_original_features(out["p_value"])
+        out = out.sort_values(
+            ["pairwise_q_value_fdr", "p_value", "feature_rank", "comparison"],
+            na_position="last",
+        ).reset_index(drop=True)
+    return out
+
+
+@_with_notebook_context
+def simpleclust_plot_original_feature_pairwise_tiles(pairwise_df, ranked_stats, out_dir, file_prefix="baseline_chr_vs_cc", top_n=30):
+    """Process simpleclust plot original feature pairwise tiles."""
+    if pairwise_df.empty:
+        return None
+    top_features = ranked_stats["feature"].drop_duplicates().head(top_n).tolist()
+    plot_df = pairwise_df[pairwise_df["feature"].isin(top_features)].dropna(subset=["effect_size"]).copy()
+    if plot_df.empty:
+        return None
+    effect = plot_df.pivot_table(
+        index="display_feature",
+        columns="comparison",
+        values="effect_size",
+        aggfunc="first",
+    )
+    q_values = plot_df.pivot_table(
+        index="display_feature",
+        columns="comparison",
+        values="pairwise_q_value_fdr",
+        aggfunc="min",
+    )
+    feature_order = [display_feature_name(feature) for feature in top_features if display_feature_name(feature) in effect.index]
+    effect = effect.reindex(feature_order)
+    q_values = q_values.reindex(feature_order)
+    annot = q_values.applymap(simpleclust_format_fdr_q)
+    vmax = np.nanmax(np.abs(effect.to_numpy(dtype=float))) if effect.notna().any().any() else 1.0
+    vmax = max(vmax, 1e-6)
+    fig_height = max(5, 0.28 * len(effect) + 1.8)
+    fig_width = max(7, 0.70 * effect.shape[1] + 3.2)
+    fig, ax = plt.subplots(figsize=(fig_width, fig_height))
+    sns.heatmap(
+        effect,
+        cmap="vlag",
+        center=0,
+        vmin=-vmax,
+        vmax=vmax,
+        annot=annot,
+        fmt="",
+        linewidths=0.35,
+        linecolor="white",
+        cbar_kws={"label": "Effect size: Cohen's d (group A - group B)"},
+        ax=ax,
+    )
+    ax.set_title("Original features: CHR subgroup pairwise post-hoc tests")
+    ax.set_xlabel("Pairwise group comparison; tile text is FDR q")
+    ax.set_ylabel("")
+    ax.tick_params(axis="x", rotation=35)
+    fig.tight_layout()
+    out_dir = Path(out_dir)
+    png_path = out_dir / f"{safe_name(file_prefix)}_all_pairwise_effect_size_tiles.png"
+    pdf_path = out_dir / f"{safe_name(file_prefix)}_all_pairwise_effect_size_tiles.pdf"
+    fig.savefig(png_path, dpi=300, bbox_inches="tight")
+    fig.savefig(pdf_path, bbox_inches="tight")
+    print("Saved original-feature pairwise effect-size tile plot to:", png_path)
+    print("Saved original-feature pairwise effect-size tile plot to:", pdf_path)
+    plt.show()
+    return fig
+
+
+@_with_notebook_context
+def simpleclust_bh_fdr(p_values):
+    """Adjust comparison p-values using the Simpleclust input policy."""
+    return adjust_pvalues_benjamini_hochberg(p_values, coerce_numeric=False)
+
+
+@_with_notebook_context
+def simpleclust_clean_compare_series(series):
+    """Process simpleclust clean compare series."""
+    return series.replace(["nan", "NaN", "None", "NULL", "null", ""], np.nan)
+
+
+@_with_notebook_context
+def simpleclust_ordinal_label_maps_from_utils(label_specs):
+    """Process simpleclust ordinal label maps from utils."""
+    ordinal_maps = []
+    for spec in label_specs or []:
+        if "mapping" in spec:
+            mapping = spec["mapping"]
+        elif spec.get("fill_middle"):
+            first, last = spec["first"], spec["last"]
+            mapping = {first: spec["first_label"], last: spec["last_label"]}
+            for code in range(first + 1, last):
+                mapping[code] = str(code)
+        else:
+            continue
+        reverse_map = {str(label).strip(): code for code, label in mapping.items()}
+        ordinal_maps.append((set(reverse_map), reverse_map))
+    return ordinal_maps
+
+
+@_with_notebook_context
+def simpleclust_coerce_compare_variable(series):
+    """Process simpleclust coerce compare variable."""
+    cleaned = simpleclust_clean_compare_series(series)
+    nonmissing = cleaned.notna()
+    if nonmissing.sum() == 0:
+        return cleaned, "categorical"
+
+    numeric = pd.to_numeric(cleaned, errors="coerce")
+    if numeric.loc[nonmissing].notna().all():
+        return numeric, "numeric"
+
+    observed_labels = set(cleaned.loc[nonmissing].astype(str).str.strip().unique())
+    for label_set, reverse_map in ORDINAL_LABEL_MAPS:
+        if observed_labels.issubset(label_set):
+            mapped = cleaned.astype("object").map(
+                lambda value: reverse_map.get(str(value).strip(), np.nan) if pd.notna(value) else np.nan
+            )
+            return pd.to_numeric(mapped, errors="coerce"), "ordinal_mapped"
+
+    return cleaned.astype("object"), "categorical"
+
+
+@_with_notebook_context
+def simpleclust_cramers_v_from_contingency(contingency):
+    """Process simpleclust cramers v from contingency."""
+    if contingency.empty:
+        return np.nan
+    try:
+        chi2_stat, _, _, _ = chi2_contingency(contingency)
+    except ValueError:
+        return np.nan
+    n = contingency.to_numpy().sum()
+    if n <= 0:
+        return np.nan
+    denom = n * max(min(contingency.shape) - 1, 1)
+    return float(np.sqrt(chi2_stat / denom)) if denom > 0 else np.nan
+
+
+@_with_notebook_context
+def simpleclust_pairwise_numeric_tests(values, groups, variable, display_name, variable_type, group_order):
+    """Process simpleclust pairwise numeric tests."""
+    rows = []
+    for group_a, group_b in combinations(group_order, 2):
+        values_a = values[groups.eq(group_a)].dropna().astype(float)
+        values_b = values[groups.eq(group_b)].dropna().astype(float)
+        statistic, p_value = np.nan, np.nan
+        if len(values_a) > 0 and len(values_b) > 0:
+            try:
+                statistic, p_value = mannwhitneyu(values_a, values_b, alternative="two-sided")
+            except ValueError:
+                pass
+        rows.append({
+            "feature": variable,
+            "display_feature": display_name,
+            "variable_type": variable_type,
+            "test": "Mann-Whitney U",
+            "comparison": f"Subgroup {group_a} vs Subgroup {group_b}",
+            "group_a": group_a,
+            "group_b": group_b,
+            "n_a": int(values_a.notna().sum()),
+            "n_b": int(values_b.notna().sum()),
+            "median_a": values_a.median() if len(values_a) else np.nan,
+            "median_b": values_b.median() if len(values_b) else np.nan,
+            "median_difference_a_minus_b": (
+                values_a.median() - values_b.median() if len(values_a) and len(values_b) else np.nan
+            ),
+            "statistic": statistic,
+            "effect_size": simpleclust_cohens_d(values_a, values_b),
+            "p_value": p_value,
+        })
+    return rows
+
+
+@_with_notebook_context
+def simpleclust_pairwise_categorical_tests(values, groups, variable, display_name, variable_type, group_order):
+    """Process simpleclust pairwise categorical tests."""
+    rows = []
+    for group_a, group_b in combinations(group_order, 2):
+        pair_df = pd.DataFrame({"value": values, "group": groups})
+        pair_df = pair_df[pair_df["group"].isin([group_a, group_b])].dropna()
+        statistic, p_value, test_name, effect_size = np.nan, np.nan, "Chi-square", np.nan
+        if pair_df["value"].nunique() >= 2 and pair_df["group"].nunique() == 2:
+            contingency = pd.crosstab(pair_df["value"], pair_df["group"])
+            effect_size = simpleclust_cramers_v_from_contingency(contingency)
+            try:
+                if contingency.shape == (2, 2):
+                    _, p_value = fisher_exact(contingency.to_numpy())
+                    test_name = "Fisher exact"
+                else:
+                    statistic, p_value, _, _ = chi2_contingency(contingency)
+            except ValueError:
+                pass
+        rows.append({
+            "feature": variable,
+            "display_feature": display_name,
+            "variable_type": variable_type,
+            "test": test_name,
+            "comparison": f"Subgroup {group_a} vs Subgroup {group_b}",
+            "group_a": group_a,
+            "group_b": group_b,
+            "n_a": int((pair_df["group"] == group_a).sum()),
+            "n_b": int((pair_df["group"] == group_b).sum()),
+            "median_a": np.nan,
+            "median_b": np.nan,
+            "median_difference_a_minus_b": np.nan,
+            "statistic": statistic,
+            "effect_size": effect_size,
+            "p_value": p_value,
+        })
+    return rows
+
+
+@_with_notebook_context
+def simpleclust_plot_top_feature_profile_dotplot(stats_df, long_df, out_dir, file_prefix, title, top_n=None, rows_per_page=24):
+    """Process simpleclust plot top feature profile dotplot."""
+    if stats_df.empty or long_df.empty:
+        return []
+    ordered_features = stats_df.sort_values(["q_value_fdr", "p_value"], na_position="last")["feature"].tolist()
+    if top_n is not None:
+        ordered_features = ordered_features[:int(top_n)]
+    plot_df = long_df[long_df["feature"].isin(ordered_features)].copy()
+    if plot_df.empty:
+        return []
+    selected_rows = []
+    for feature in ordered_features:
+        feature_df = plot_df[plot_df["feature"].eq(feature)]
+        if feature_df.empty:
+            continue
+        if feature_df["variable_type"].iloc[0] == "categorical":
+            row_label = (
+                feature_df.groupby("row_label")["standardized_difference"]
+                .apply(lambda values: values.abs().max())
+                .sort_values(ascending=False)
+                .index[0]
+            )
+            feature_df = feature_df[feature_df["row_label"].eq(row_label)]
+        selected_rows.append(feature_df)
+    if not selected_rows:
+        return []
+    plot_df = pd.concat(selected_rows, ignore_index=True)
+    q_lookup = stats_df.set_index("feature")["q_value_fdr"].to_dict()
+    plot_df["feature_label"] = plot_df.apply(
+        lambda row: f"{row['row_label']} (q={simpleclust_format_fdr_q(q_lookup.get(row['feature'], np.nan))})",
+        axis=1,
+    )
+    feature_order = plot_df.drop_duplicates("feature_label")["feature_label"].tolist()
+    pages = [feature_order]
+    figures = []
+    for page_index, page_features in enumerate(pages, start=1):
+        page_df = plot_df[plot_df["feature_label"].isin(page_features)].copy()
+        page_order = page_features[::-1]
+        page_df["feature_label"] = pd.Categorical(page_df["feature_label"], categories=page_order, ordered=True)
+        y_codes = page_df["feature_label"].cat.codes.to_numpy(dtype=float)
+        effect_values = page_df["standardized_difference"].to_numpy(dtype=float)
+        vmax = np.nanmax(np.abs(effect_values)) if np.isfinite(effect_values).any() else 1.0
+        vmax = max(vmax, 1e-6)
+        subgroup_values = sorted(page_df["subgroup"].dropna().unique().tolist())
+        marker_cycle = ["o", "s", "^", "D", "X", "P"]
+        marker_map = {subgroup: marker_cycle[i % len(marker_cycle)] for i, subgroup in enumerate(subgroup_values)}
+        fig_height = max(7, 0.30 * len(page_order) + 2.0)
+        fig, ax = plt.subplots(figsize=(9.5, fig_height))
+        scatter = None
+        for subgroup in subgroup_values:
+            mask = page_df["subgroup"].eq(subgroup).to_numpy()
+            scatter = ax.scatter(
+                effect_values[mask],
+                y_codes[mask],
+                c=effect_values[mask],
+                cmap="vlag",
+                vmin=-vmax,
+                vmax=vmax,
+                marker=marker_map[subgroup],
+                s=58,
+                edgecolor="black",
+                linewidth=0.25,
+                label=f"Subgroup {subgroup}",
+            )
+        ax.axvline(0, color=theme.THEME["muted"], linewidth=0.8)
+        page_suffix = f" page {page_index}/{len(pages)}" if len(pages) > 1 else ""
+        ax.set_title(f"{title}{page_suffix}")
+        ax.set_xlabel("Effect size: standardized subgroup difference from labelled discovery sample")
+        ax.set_ylabel("")
+        ax.set_yticks(np.arange(len(page_order)))
+        ax.set_yticklabels(page_order)
+        ax.legend(title="Subgroup", bbox_to_anchor=(1.02, 1), loc="upper left", frameon=False)
+        if scatter is not None:
+            cbar = fig.colorbar(scatter, ax=ax, pad=0.02)
+            cbar.set_label("Effect size")
+        fig.tight_layout()
+        suffix = "all_feature_profile_dotplot" if top_n is None else "top_feature_profile_dotplot"
+        page_token = f"_page_{page_index:02d}" if len(pages) > 1 else ""
+        png_path = Path(out_dir) / f"{file_prefix}_{suffix}{page_token}.png"
+        pdf_path = Path(out_dir) / f"{file_prefix}_{suffix}{page_token}.pdf"
+        fig.savefig(png_path, dpi=300, bbox_inches="tight")
+        fig.savefig(pdf_path, bbox_inches="tight")
+        print("Saved feature profile dot plot to:", png_path)
+        print("Saved feature profile dot plot to:", pdf_path)
+        plt.show()
+        figures.append(fig)
+    return figures
+
+
+@_with_notebook_context
+def simpleclust_plot_pairwise_fdr_tiles(pairwise_df, stats_df, out_dir, file_prefix, title, top_n=None, rows_per_page=24):
+    """Process simpleclust plot pairwise fdr tiles."""
+    if pairwise_df.empty or stats_df.empty:
+        return []
+    ordered_features = stats_df.sort_values(["q_value_fdr", "p_value"], na_position="last")["feature"].tolist()
+    if top_n is not None:
+        ordered_features = ordered_features[:int(top_n)]
+    plot_df = pairwise_df[pairwise_df["feature"].isin(ordered_features)].copy()
+    plot_df = plot_df.dropna(subset=["effect_size"])
+    if plot_df.empty:
+        return []
+    plot_df["feature_label"] = plot_df["display_feature"]
+    feature_order = [display_feature_name(feature) for feature in ordered_features if display_feature_name(feature) in set(plot_df["feature_label"])]
+    pages = [feature_order]
+    figures = []
+    for page_index, page_features in enumerate(pages, start=1):
+        page_df = plot_df[plot_df["feature_label"].isin(page_features)].copy()
+        effect = page_df.pivot_table(
+            index="feature_label",
+            columns="comparison",
+            values="effect_size",
+            aggfunc="first",
+        ).reindex(page_features)
+        q_values = page_df.pivot_table(
+            index="feature_label",
+            columns="comparison",
+            values="pairwise_q_value_fdr",
+            aggfunc="min",
+        ).reindex(page_features)
+        annot = q_values.applymap(simpleclust_format_fdr_q)
+        vmax = np.nanmax(np.abs(effect.to_numpy(dtype=float))) if effect.notna().any().any() else 1.0
+        vmax = max(vmax, 1e-6)
+        fig_height = max(7, 0.28 * len(effect) + 2.0)
+        fig_width = max(7.5, 0.72 * effect.shape[1] + 3.2)
+        fig, ax = plt.subplots(figsize=(fig_width, fig_height))
+        sns.heatmap(
+            effect,
+            cmap="vlag",
+            center=0,
+            vmin=-vmax,
+            vmax=vmax,
+            annot=annot,
+            fmt="",
+            linewidths=0.35,
+            linecolor="white",
+            cbar_kws={"label": "Effect size: Cohen's d; Cramer's V for categorical"},
+            ax=ax,
+        )
+        page_suffix = f" page {page_index}/{len(pages)}" if len(pages) > 1 else ""
+        ax.set_title(f"{title}{page_suffix}")
+        ax.set_xlabel("Pairwise subgroup comparison; tile text is FDR q")
+        ax.set_ylabel("")
+        ax.tick_params(axis="x", rotation=35)
+        fig.tight_layout()
+        suffix = "pairwise_effect_size_tiles" if top_n is None else "top_pairwise_effect_size_tiles"
+        page_token = f"_page_{page_index:02d}" if len(pages) > 1 else ""
+        png_path = Path(out_dir) / f"{file_prefix}_{suffix}{page_token}.png"
+        pdf_path = Path(out_dir) / f"{file_prefix}_{suffix}{page_token}.pdf"
+        fig.savefig(png_path, dpi=300, bbox_inches="tight")
+        fig.savefig(pdf_path, bbox_inches="tight")
+        print("Saved pairwise effect-size tile plot to:", png_path)
+        print("Saved pairwise effect-size tile plot to:", pdf_path)
+        plt.show()
+        figures.append(fig)
+    return figures
+
+
+@_with_notebook_context
+def simpleclust_compare_extra_features_by_cluster(
+    source_df,
+    final_data,
+    final_labels,
+    meta,
+    modality="compare_clusters",
+    subject_id_column="src_subject_id",
+):
+    """Process simpleclust compare extra features by cluster."""
+    compare_vars = (
+        meta.loc[meta["Modality"].eq(modality), "ElementName"]
+        .dropna()
+        .astype(str)
+        .drop_duplicates()
+        .tolist()
+    )
+    available_vars = [var for var in compare_vars if var in source_df.columns]
+    missing_vars = [var for var in compare_vars if var not in source_df.columns]
+    if not available_vars:
+        raise ValueError(
+            f"No {modality!r} metadata variables were found in the source dataframe. "
+            f"Examples from metadata: {compare_vars[:8]}"
+        )
+
+    labels_df = pd.DataFrame({
+        subject_id_column: final_data[subject_id_column].astype(str).to_numpy(),
+        "simpleclust_subgroup": np.asarray(final_labels),
+    })
+    analysis_df = (
+        source_df[[subject_id_column] + available_vars]
+        .copy()
+        .assign(**{subject_id_column: lambda df: df[subject_id_column].astype(str)})
+        .merge(labels_df, on=subject_id_column, how="inner", validate="one_to_one")
+    )
+    if analysis_df.empty:
+        raise ValueError("No labelled discovery subjects were available after merging extra features by subject ID.")
+
+    subgroup_order = sorted(analysis_df["simpleclust_subgroup"].dropna().unique())
+    stats_rows = []
+    heatmap_rows = []
+    long_rows = []
+    pairwise_rows = []
+
+    for variable in available_vars:
+        raw = simpleclust_clean_compare_series(analysis_df[variable])
+        coerced_values, variable_type = simpleclust_coerce_compare_variable(raw)
+        display_name = display_feature_name(variable)
+
+        if variable_type in {"numeric", "ordinal_mapped"}:
+            values = pd.to_numeric(coerced_values, errors="coerce")
+            test_df = pd.DataFrame({"value": values, "subgroup": analysis_df["simpleclust_subgroup"]}).dropna()
+            groups = [group["value"].to_numpy() for _, group in test_df.groupby("subgroup") if len(group) > 0]
+            if len(groups) >= 2 and sum(len(group) > 1 for group in groups) >= 2:
+                stat, p_value = kruskal(*groups)
+            else:
+                stat, p_value = np.nan, np.nan
+
+            overall_mean = values.mean(skipna=True)
+            overall_sd = values.std(skipna=True, ddof=0)
+            if not np.isfinite(overall_sd) or overall_sd == 0:
+                overall_sd = 1.0
+
+            row = {"feature": variable, "display_feature": display_name, "row_label": display_name}
+            for subgroup in subgroup_order:
+                subgroup_values = values[analysis_df["simpleclust_subgroup"].eq(subgroup)]
+                row[f"Subgroup {subgroup}"] = (subgroup_values.mean(skipna=True) - overall_mean) / overall_sd
+                long_rows.append({
+                    "feature": variable,
+                    "display_feature": display_name,
+                    "row_label": display_name,
+                    "variable_type": variable_type,
+                    "subgroup": subgroup,
+                    "n": int(subgroup_values.notna().sum()),
+                    "mean_or_proportion": subgroup_values.mean(skipna=True),
+                    "standardized_difference": row[f"Subgroup {subgroup}"],
+                })
+            heatmap_rows.append(row)
+            pairwise_rows.extend(
+                simpleclust_pairwise_numeric_tests(
+                    values=values,
+                    groups=analysis_df["simpleclust_subgroup"],
+                    variable=variable,
+                    display_name=display_name,
+                    variable_type=variable_type,
+                    group_order=subgroup_order,
+                )
+            )
+
+            stats_rows.append({
+                "feature": variable,
+                "display_feature": display_name,
+                "variable_type": variable_type,
+                "test": "Kruskal-Wallis",
+                "statistic": stat,
+                "p_value": p_value,
+                "n": int(values.notna().sum()),
+                "missing": int(values.isna().sum()),
+                "levels_or_categories": np.nan,
+            })
+            continue
+
+        categorical = coerced_values.astype("object").where(raw.notna(), np.nan)
+        test_df = pd.DataFrame({"value": categorical, "subgroup": analysis_df["simpleclust_subgroup"]}).dropna()
+        if test_df.empty or test_df["value"].nunique() < 2 or test_df["subgroup"].nunique() < 2:
+            stat, p_value, test_name = np.nan, np.nan, "Chi-square"
+        else:
+            contingency = pd.crosstab(test_df["value"], test_df["subgroup"])
+            if contingency.shape == (2, 2):
+                _, p_value = fisher_exact(contingency.to_numpy())
+                stat, test_name = np.nan, "Fisher exact"
+            else:
+                stat, p_value, _, _ = chi2_contingency(contingency)
+                test_name = "Chi-square"
+
+        stats_rows.append({
+            "feature": variable,
+            "display_feature": display_name,
+            "variable_type": variable_type,
+            "test": test_name,
+            "statistic": stat,
+            "p_value": p_value,
+            "n": int(categorical.notna().sum()),
+            "missing": int(categorical.isna().sum()),
+            "levels_or_categories": int(categorical.nunique(dropna=True)),
+        })
+
+        overall_props = categorical.value_counts(normalize=True, dropna=True)
+        for category in sorted(overall_props.index, key=lambda value: str(value)):
+            category_mask = categorical.eq(category)
+            overall_p = overall_props.loc[category]
+            denom = np.sqrt(max(overall_p * (1 - overall_p), 1e-6))
+            row_label = f"{display_name} = {category}"
+            row = {"feature": variable, "display_feature": display_name, "row_label": row_label}
+            for subgroup in subgroup_order:
+                subgroup_mask = analysis_df["simpleclust_subgroup"].eq(subgroup)
+                subgroup_n = int((subgroup_mask & categorical.notna()).sum())
+                subgroup_p = category_mask[subgroup_mask & categorical.notna()].mean() if subgroup_n else np.nan
+                row[f"Subgroup {subgroup}"] = (subgroup_p - overall_p) / denom if pd.notna(subgroup_p) else np.nan
+                long_rows.append({
+                    "feature": variable,
+                    "display_feature": display_name,
+                    "row_label": row_label,
+                    "variable_type": variable_type,
+                    "subgroup": subgroup,
+                    "n": subgroup_n,
+                    "mean_or_proportion": subgroup_p,
+                    "standardized_difference": row[f"Subgroup {subgroup}"],
+                })
+            heatmap_rows.append(row)
+
+        pairwise_rows.extend(
+            simpleclust_pairwise_categorical_tests(
+                values=categorical,
+                groups=analysis_df["simpleclust_subgroup"],
+                variable=variable,
+                display_name=display_name,
+                variable_type=variable_type,
+                group_order=subgroup_order,
+            )
+        )
+
+    stats_df = pd.DataFrame(stats_rows)
+    stats_df["q_value_fdr"] = simpleclust_bh_fdr(stats_df["p_value"])
+    stats_df["significant_fdr_0_05"] = stats_df["q_value_fdr"].lt(0.05)
+    stats_df = stats_df.sort_values(["q_value_fdr", "p_value", "display_feature"], na_position="last").reset_index(drop=True)
+
+    heatmap_df = pd.DataFrame(heatmap_rows)
+    if not heatmap_df.empty:
+        ordering = stats_df.set_index("feature")["q_value_fdr"].to_dict()
+        heatmap_df["_q_value_fdr"] = heatmap_df["feature"].map(ordering)
+        heatmap_df = heatmap_df.sort_values(["_q_value_fdr", "display_feature", "row_label"], na_position="last")
+        q_lookup = stats_df.set_index("feature")["q_value_fdr"].to_dict()
+        p_lookup = stats_df.set_index("feature")["p_value"].to_dict()
+        heatmap_df["row_label_with_q"] = heatmap_df.apply(
+            lambda row: f"{row['row_label']}  (q={q_lookup.get(row['feature'], np.nan):.3g})"
+            if pd.notna(q_lookup.get(row["feature"], np.nan))
+            else row["row_label"],
+            axis=1,
+        )
+        heatmap_df["p_value"] = heatmap_df["feature"].map(p_lookup)
+        heatmap_df["q_value_fdr"] = heatmap_df["feature"].map(q_lookup)
+
+    long_df = pd.DataFrame(long_rows)
+    pairwise_df = pd.DataFrame(pairwise_rows)
+    if not pairwise_df.empty:
+        pairwise_df["pairwise_q_value_fdr"] = simpleclust_bh_fdr(pairwise_df["p_value"])
+        pairwise_df = pairwise_df.sort_values(
+            ["pairwise_q_value_fdr", "p_value", "display_feature", "comparison"],
+            na_position="last",
+        ).reset_index(drop=True)
+    return stats_df, heatmap_df, long_df, pairwise_df, missing_vars
+
+
+@_with_notebook_context
+def simpleclust_alternative_run_names():
+    """Process simpleclust alternative run names."""
+    return [
+        run_name
+        for run_name in sorted(dimred_runs)
+        if run_name != best_dimred_option
+    ]
+
+
+@_with_notebook_context
+def simpleclust_plot_dimred_consensus_matrix(run_name, run_metrics, out_dir=None):
+    """Process simpleclust plot dimred consensus matrix."""
+    diag = run_metrics.get('final_stability_SUM_MAT_full', {})
+    if 'consensus' not in diag:
+        print(f'{run_name}: no final consensus matrix available.')
+        return None
+
+    M = np.asarray(diag['consensus'], dtype=float)
+    if M.ndim != 2 or M.shape[0] != M.shape[1]:
+        print(f'{run_name}: final consensus matrix is not square, skipping matrix plot.')
+        return None
+
+    M = (M + M.T) / 2.0
+    np.fill_diagonal(M, 1.0)
+    title_suffix = 'hierarchical order'
+
+    union_ids = np.asarray(diag.get('union_ids', []))
+    final_data = run_metrics.get('data')
+    final_labels = np.asarray(run_metrics.get('final_labels', []))
+    if (
+        isinstance(final_data, pd.DataFrame)
+        and 'src_subject_id' in final_data.columns
+        and len(union_ids) == M.shape[0]
+        and len(final_labels) == len(final_data)
+    ):
+        label_by_id = dict(zip(final_data['src_subject_id'].to_numpy(), final_labels))
+        labels_aligned = np.asarray([label_by_id.get(uid, -1) for uid in union_ids])
+        order = np.lexsort((np.arange(len(labels_aligned)), labels_aligned))
+        title_suffix = 'sorted by final labels'
+    else:
+        D = 1.0 - M
+        order = leaves_list(linkage(squareform(D, checks=False), method='average'))
+
+    M_ord = M[np.ix_(order, order)]
+
+    fig, ax = plt.subplots(figsize=(8, 7))
+    im = ax.imshow(M_ord, aspect='auto', vmin=0, vmax=1)
+    ax.set_title(f'{run_name}: consensus matrix ({title_suffix})')
+    ax.set_xlabel('Samples')
+    ax.set_ylabel('Samples')
+    fig.colorbar(im, ax=ax, label='Consensus')
+    fig.tight_layout()
+
+    if out_dir is not None:
+        os.makedirs(out_dir, exist_ok=True)
+        for ext in ('png', 'pdf'):
+            matrix_path = os.path.join(out_dir, f'{safe_name(run_name)}_consensus_matrix.{ext}')
+            fig.savefig(matrix_path, dpi=300, bbox_inches='tight')
+            print('Saved matrix plot to:', matrix_path)
+
+    plt.show()
+    return fig
+
+
+@_with_notebook_context
+def simpleclust_merge_simpleclust_cc_preprocessed(dict_final_cc, preproc_artifact, training_feature_order):
+    """Process simpleclust merge simpleclust cc preprocessed."""
+    cc_preprocessed = None
+    for cc_modality in preproc_artifact.get('modalities_in_output', []):
+        if cc_modality not in dict_final_cc:
+            continue
+        cc_modality_df = dict_final_cc[cc_modality].copy()
+        cc_feature_columns = [
+            column for column in cc_modality_df.columns
+            if column != 'src_subject_id'
+        ]
+        prefixed_df = cc_modality_df.rename(columns={
+            column: f'{cc_modality}__{column}'
+            for column in cc_feature_columns
+        })
+        cc_preprocessed = (
+            prefixed_df
+            if cc_preprocessed is None
+            else cc_preprocessed.merge(
+                prefixed_df,
+                on='src_subject_id',
+                how='inner',
+                validate='one_to_one',
+            )
+        )
+
+    if cc_preprocessed is None or cc_preprocessed.empty:
+        raise ValueError('No aligned discovery CC modalities were available after preprocessing.')
+
+    missing_features = [
+        column for column in training_feature_order
+        if column not in cc_preprocessed.columns
+    ]
+    if missing_features and len(dict_final_cc) == 1:
+        # Support older/simple single-modality exports that did not prefix columns.
+        only_modality_df = next(iter(dict_final_cc.values())).copy()
+        unprefixed_missing = [
+            column for column in training_feature_order
+            if column not in only_modality_df.columns
+        ]
+        if not unprefixed_missing:
+            cc_preprocessed = only_modality_df
+            missing_features = []
+
+    if missing_features:
+        raise ValueError(
+            f'CC preprocessing is missing {len(missing_features)} training features; '
+            f'examples: {missing_features[:10]}'
+        )
+
+    return cc_preprocessed[['src_subject_id'] + training_feature_order]
+
+
+@_with_notebook_context
+def simpleclust_build_cc_preprocessed_for_dimred_run(run_metrics):
+    """Process simpleclust build cc preprocessed for dimred run."""
+    preproc_artifact = run_metrics.get('preprocessing_details')
+    if preproc_artifact is None:
+        raise ValueError('Run does not contain preprocessing_details.')
+
+    _, _, dict_final_cc = apply_preprocessing_to_new_data(
+        cleaned_discovery_CC.copy(),
+        meta,
+        preproc_artifact,
+        subject_id_column='src_subject_id',
+    )
+    training_feature_order = [
+        column for column in run_metrics['data'].columns
+        if column != 'src_subject_id'
+    ]
+    return simpleclust_merge_simpleclust_cc_preprocessed(
+        dict_final_cc=dict_final_cc,
+        preproc_artifact=preproc_artifact,
+        training_feature_order=training_feature_order,
+    )
+
+
+@_with_notebook_context
+def simpleclust_display_saved_boxplot_pages(out_dir, file_prefix):
+    """Process simpleclust display saved boxplot pages."""
+    pattern = os.path.join(out_dir, f'{safe_name(file_prefix)}_boxplots_page_*.png')
+    for png_path in sorted(glob.glob(pattern)):
+        display(Image(filename=png_path))
+
+
+@_with_notebook_context
+def simpleclust_cluster_size_summary(labels):
+    """Process simpleclust cluster size summary."""
+    labels = np.asarray(labels)
+    if labels.size == 0:
+        return {}
+    return pd.Series(labels).value_counts().sort_index().to_dict()
+
+
+@_with_notebook_context
+def simpleclust_load_alternative_k_results():
+    """Process simpleclust load alternative k results."""
+    loaded = {}
+    seen_dirs = set()
+    for run_name, run_payload in sorted(dimred_runs.items()):
+        search_roots = [Path(run_payload['results_dir']), Path(run_payload['base'])]
+        for search_root in search_roots:
+            if not search_root.exists():
+                continue
+            for alt_dir in sorted(search_root.glob('alternative_k*')):
+                if not alt_dir.is_dir() or alt_dir.resolve() in seen_dirs:
+                    continue
+                seen_dirs.add(alt_dir.resolve())
+                final_path = alt_dir / 'final' / 'final_metrics.pkl'
+                failure_path = alt_dir / 'merge_failure.json'
+                result_key = f'{run_name}:{alt_dir.name}'
+                payload = {
+                    'dimred_option': run_name,
+                    'alternative_k': alt_dir.name,
+                    'result_key': result_key,
+                    'alt_dir': str(alt_dir),
+                    'final_metrics_path': str(final_path),
+                    'final_metrics': None,
+                    'merge_failure_path': str(failure_path) if failure_path.exists() else None,
+                    'provenance_files': {
+                        name: str(alt_dir / name)
+                        for name in [
+                            'synthetic_fold_manifest.csv',
+                            'candidate_ranking_k.csv',
+                            'selected_fold_candidates.csv',
+                            'selection_summary.json',
+                        ]
+                        if (alt_dir / name).exists()
+                    },
+                }
+                if final_path.exists():
+                    with open(final_path, 'rb') as f:
+                        payload['final_metrics'] = pickle.load(f)
+                loaded[result_key] = payload
+    return loaded
+
+
+@_with_notebook_context
+def simpleclust_merge_validation_modalities_for_svm(feature_dict, modalities_to_use, subject_ids, subject_id_column='src_subject_id'):
+    """Process simpleclust merge validation modalities for svm."""
+    merged = None
+    for modality in modalities_to_use:
+        if modality not in feature_dict:
+            continue
+        modality_df = feature_dict[modality].copy()
+        if subject_id_column not in modality_df.columns:
+            raise ValueError(f"{modality} validation data is missing {subject_id_column}.")
+        if modality_df[subject_id_column].tolist() != subject_ids:
+            modality_df = (
+                modality_df
+                .set_index(subject_id_column)
+                .loc[subject_ids]
+                .reset_index()
+            )
+        feature_columns = [column for column in modality_df.columns if column != subject_id_column]
+        modality_df = modality_df.rename(columns={
+            column: f'{modality}__{column}'
+            for column in feature_columns
+            if not str(column).startswith(f'{modality}__')
+        })
+        merged = modality_df if merged is None else merged.merge(
+            modality_df,
+            on=subject_id_column,
+            how='inner',
+            validate='one_to_one',
+        )
+    if merged is None or merged.empty:
+        raise ValueError('No preprocessed validation feature data available for SVM prediction.')
+    return merged
+
+
+@_with_notebook_context
+def simpleclust_merge_validation_feature_dict(feature_dict, modalities_to_use, subject_ids, subject_id_column='src_subject_id'):
+    """Process simpleclust merge validation feature dict."""
+    merged = None
+    for modality in modalities_to_use:
+        if modality not in feature_dict:
+            continue
+        modality_df = feature_dict[modality].copy()
+        if subject_id_column not in modality_df.columns:
+            raise ValueError(f"{modality} validation data is missing {subject_id_column}.")
+        if modality_df[subject_id_column].tolist() != subject_ids:
+            modality_df = (
+                modality_df
+                .set_index(subject_id_column)
+                .loc[subject_ids]
+                .reset_index()
+            )
+        feature_columns = [column for column in modality_df.columns if column != subject_id_column]
+        modality_df = modality_df.rename(columns={
+            column: f'{modality}__{column}'
+            for column in feature_columns
+            if not str(column).startswith(f'{modality}__')
+        })
+        merged = modality_df if merged is None else merged.merge(
+            modality_df,
+            on=subject_id_column,
+            how='inner',
+            validate='one_to_one',
+        )
+    if merged is None or merged.empty:
+        raise ValueError('No validation feature data available for ANOVA plots.')
+    return merged
+
+
+@_with_notebook_context
+def simpleclust_validation_cc_source_dataframe():
+    """Process simpleclust validation cc source dataframe."""
+    if 'cleaned_test_CC' in globals() and isinstance(cleaned_test_CC, pd.DataFrame) and not cleaned_test_CC.empty:
+        return cleaned_test_CC.copy(), 'held-out/test CC split'
+    if 'test_data_CC' in globals() and isinstance(test_data_CC, pd.DataFrame) and not test_data_CC.empty:
+        return test_data_CC.copy(), 'held-out/test CC split before missingness filtering'
+    if 'cleaned_discovery_CC' in globals() and isinstance(cleaned_discovery_CC, pd.DataFrame) and not cleaned_discovery_CC.empty:
+        return cleaned_discovery_CC.copy(), 'discovery CC fallback'
+    return None, None
+
+
+@_with_notebook_context
+def simpleclust_preprocess_cc_like_validation_chr(cc_source_df, cc_source_label):
+    """Process simpleclust preprocess cc like validation chr."""
+    if cc_source_df is None or cc_source_df.empty:
+        print('No CC dataframe is available for validation plots; CC overlays will be skipped.')
+        return None
+    if 'preproc_artifact' not in globals() or preproc_artifact is None:
+        raise ValueError('preproc_artifact is required to align validation CC to the validation CHR feature space.')
+    _, _, dict_final_validation_cc = apply_preprocessing_to_new_data(
+        cc_source_df.copy(),
+        meta,
+        preproc_artifact,
+        subject_id_column=subject_id_column,
+    )
+    validation_cc = simpleclust_merge_validation_feature_dict(
+        dict_final_validation_cc,
+        modalities_for_feature_plots,
+        dict_final_validation_cc[modalities_for_feature_plots[0]][subject_id_column].tolist(),
+        subject_id_column=subject_id_column,
+    )
+    missing_validation_cc_features = [
+        column for column in validation_data_for_plots.columns
+        if column != subject_id_column and column not in validation_cc.columns
+    ]
+    if missing_validation_cc_features:
+        raise ValueError(
+            f'Validation CC preprocessing is missing {len(missing_validation_cc_features)} validation CHR features; '
+            f'examples: {missing_validation_cc_features[:10]}'
+        )
+    validation_cc = validation_cc[[subject_id_column] + [c for c in validation_data_for_plots.columns if c != subject_id_column]]
+    print(f'Validation CC preprocessing complete using {cc_source_label}:', validation_cc.shape)
+    return validation_cc
+
+
+@_with_notebook_context
+def simpleclust_plot_validation_feature_mean_heatmap(feature_matrix, labels, out_dir, file_prefix, title, features=None, control_matrix=None):
+    """Process simpleclust plot validation feature mean heatmap."""
+    if features is None:
+        features = order_simpleclust_features(feature_matrix.columns)
+    features = [feature for feature in features if feature in feature_matrix.columns]
+    if not features:
+        print(f'{title}: no available features for heatmap.')
+        return None
+    plot_matrix = feature_matrix[features].apply(pd.to_numeric, errors='coerce')
+    plot_matrix = plot_matrix.loc[:, plot_matrix.notna().any(axis=0)]
+    if plot_matrix.empty:
+        print(f'{title}: no numeric non-empty features for heatmap.')
+        return None
+    use_features = plot_matrix.columns.tolist()
+    combined_for_scale = plot_matrix.copy()
+    control_numeric = None
+    if control_matrix is not None:
+        control_numeric = (
+            control_matrix.reindex(columns=use_features)
+            .apply(pd.to_numeric, errors='coerce')
+            .dropna(axis=0, how='all')
+        )
+        if not control_numeric.empty:
+            combined_for_scale = pd.concat([combined_for_scale, control_numeric], ignore_index=True)
+    standardized = plot_matrix.sub(combined_for_scale.mean(axis=0), axis=1).div(
+        combined_for_scale.std(axis=0, ddof=0).replace(0, np.nan),
+        axis=1,
+    ).fillna(0)
+    heatmap_df = standardized.assign(_subgroup=pd.Series(labels).astype(str).to_numpy())
+    mean_matrix = heatmap_df.groupby('_subgroup', observed=False)[standardized.columns].mean()
+    mean_matrix = mean_matrix.reindex(sorted(mean_matrix.index, key=lambda value: str(value)))
+    if control_numeric is not None and not control_numeric.empty:
+        control_standardized = control_numeric.sub(combined_for_scale.mean(axis=0), axis=1).div(
+            combined_for_scale.std(axis=0, ddof=0).replace(0, np.nan),
+            axis=1,
+        ).fillna(0)
+        mean_matrix.loc['CC'] = control_standardized.mean(axis=0)
+    mean_matrix.columns = [display_feature_name(feature) for feature in mean_matrix.columns]
+
+    fig_width = min(max(12, 0.38 * mean_matrix.shape[1] + 3), 44)
+    fig_height = max(3.5, 0.55 * mean_matrix.shape[0] + 2.2)
+    fig, ax = plt.subplots(figsize=(fig_width, fig_height))
+    sns.heatmap(
+        mean_matrix,
+        cmap='vlag',
+        center=0,
+        linewidths=0.25,
+        linecolor='white',
+        cbar_kws={'label': 'Mean z-score'},
+        ax=ax,
+    )
+    ax.set_title(title)
+    ax.set_xlabel('Feature')
+    ax.set_ylabel('Predicted validation subgroup / CC')
+    ax.tick_params(axis='x', rotation=70, labelsize=8)
+    fig.tight_layout()
+    for ext in ('png', 'pdf'):
+        output_path = os.path.join(out_dir, f'{file_prefix}.{ext}')
+        fig.savefig(output_path, dpi=300, bbox_inches='tight')
+        print('Saved validation feature heatmap to:', output_path)
+    plt.show()
+    return mean_matrix
+
+
+# -----------------------------------------------------------------------------
+# clinical_paper/Clinical_main_work.ipynb analysis helpers
+# Implementations are preserved from the original notebook cells.
+# -----------------------------------------------------------------------------
+
+@_with_notebook_context
+def clinical_analysis_save_figure_png_pdf(fig, output_path, dpi=300, **savefig_kwargs):
+    """Process clinical analysis save figure png pdf."""
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    saved_paths = []
+    for suffix in (".png", ".pdf"):
+        target = output_path.with_suffix(suffix)
+        fig.savefig(target, dpi=dpi, **savefig_kwargs)
+        saved_paths.append(target)
+    return saved_paths
+
+
+@_with_notebook_context
+def clinical_analysis_extract_dictionary_codes(note):
+    """Process clinical analysis extract dictionary codes."""
+    if pd.isna(note) or note == "":
+        return []
+    codes = []
+    for raw in re.findall(r"(-?\d+(?:\.\d+)?)\s*=\s*[^,;]+", str(note)):
+        try:
+            code = float(raw)
+        except ValueError:
+            continue
+        if code not in ignore_keys:
+            codes.append(code)
+    return sorted(set(codes))
+
+
+@_with_notebook_context
+def clinical_analysis_should_convert_to_categorical(series, max_unique_numeric=20):
+    """Process clinical analysis should convert to categorical."""
+    non_missing = series.dropna()
+    if non_missing.empty:
+        return False
+    if not pd.api.types.is_numeric_dtype(non_missing):
+        return True
+
+    numeric = pd.to_numeric(non_missing, errors="coerce")
+    if numeric.isna().any():
+        return False
+    n_unique = numeric.nunique(dropna=True)
+    integer_like = np.all(np.isclose(numeric, np.round(numeric)))
+    return n_unique <= max_unique_numeric and integer_like
+
+
+@_with_notebook_context
+def clinical_analysis_pairwise_correlation_level(abs_r):
+    """Process clinical analysis pairwise correlation level."""
+    if pd.isna(abs_r):
+        return np.nan
+    if abs_r >= 0.90:
+        return "severe"
+    if abs_r >= 0.70:
+        return "moderate_high"
+    if abs_r >= 0.50:
+        return "moderate"
+    return "low"
+
+
+@_with_notebook_context
+def clinical_analysis_vif_level(vif):
+    """Process clinical analysis vif level."""
+    if pd.isna(vif):
+        return np.nan
+    if np.isinf(vif) or vif >= 10:
+        return "critical"
+    if vif >= 5:
+        return "high"
+    if vif >= 2.5:
+        return "moderate"
+    return "low"
+
+
+@_with_notebook_context
+def clinical_analysis_condition_index_level(condition_index):
+    """Process clinical analysis condition index level."""
+    if pd.isna(condition_index):
+        return np.nan
+    if np.isinf(condition_index) or condition_index >= 30:
+        return "critical"
+    if condition_index >= 10:
+        return "moderate_strong"
+    return "low"
+
+
+@_with_notebook_context
+def clinical_analysis_prepare_numeric_domain_matrix(data, variables, min_pairwise_n=3):
+    """Process clinical analysis prepare numeric domain matrix."""
+    X = data[variables].apply(pd.to_numeric, errors="coerce")
+    valid_vars = [
+        col for col in X.columns
+        if X[col].notna().sum() >= min_pairwise_n and X[col].nunique(dropna=True) > 1
+    ]
+    X = X[valid_vars]
+    if X.empty:
+        return X
+
+    X = X.dropna(axis=0, how="all")
+    X = X.fillna(X.median(numeric_only=True))
+    valid_vars = [col for col in X.columns if X[col].nunique(dropna=True) > 1]
+    return X[valid_vars]
+
+
+@_with_notebook_context
+def clinical_analysis_compute_vif_table(X, domain_name):
+    """Process clinical analysis compute vif table."""
+    rows = []
+    if X.shape[1] < 2:
+        return rows
+
+    X_values = X.to_numpy(dtype=float)
+    X_values = (X_values - np.nanmean(X_values, axis=0)) / np.nanstd(X_values, axis=0, ddof=0)
+    X_values = np.nan_to_num(X_values, nan=0.0, posinf=0.0, neginf=0.0)
+
+    for idx, variable in enumerate(X.columns):
+        y = X_values[:, idx]
+        others = np.delete(X_values, idx, axis=1)
+        design = np.column_stack([np.ones(others.shape[0]), others])
+        try:
+            coef, *_ = np.linalg.lstsq(design, y, rcond=None)
+            y_hat = design @ coef
+            ss_res = float(np.sum((y - y_hat) ** 2))
+            ss_tot = float(np.sum((y - y.mean()) ** 2))
+            r_squared = 1.0 - (ss_res / ss_tot) if ss_tot > 0 else np.nan
+            r_squared = min(max(r_squared, 0.0), 1.0) if np.isfinite(r_squared) else np.nan
+            tolerance = 1.0 - r_squared if np.isfinite(r_squared) else np.nan
+            vif = 1.0 / tolerance if np.isfinite(tolerance) and tolerance > 0 else np.inf
+        except np.linalg.LinAlgError:
+            r_squared = np.nan
+            tolerance = 0.0
+            vif = np.inf
+
+        rows.append({
+            "domain": domain_name,
+            "variable": variable,
+            "vif": vif,
+            "tolerance": tolerance,
+            "r_squared_with_other_variables": r_squared,
+            "vif_level": clinical_analysis_vif_level(vif),
+        })
+    return rows
+
+
+@_with_notebook_context
+def clinical_analysis_compute_condition_index(X):
+    """Process clinical analysis compute condition index."""
+    if X.shape[1] < 2:
+        return np.nan, np.nan, np.nan
+
+    X_values = X.to_numpy(dtype=float)
+    X_values = (X_values - np.nanmean(X_values, axis=0)) / np.nanstd(X_values, axis=0, ddof=0)
+    X_values = np.nan_to_num(X_values, nan=0.0, posinf=0.0, neginf=0.0)
+    corr = np.corrcoef(X_values, rowvar=False)
+    corr = np.nan_to_num(corr, nan=0.0, posinf=0.0, neginf=0.0)
+    corr = (corr + corr.T) / 2.0
+    np.fill_diagonal(corr, 1.0)
+
+    eigenvalues = np.linalg.eigvalsh(corr)
+    eigenvalues = np.clip(eigenvalues, 0.0, None)
+    max_eigenvalue = float(np.max(eigenvalues)) if eigenvalues.size else np.nan
+    positive_eigenvalues = eigenvalues[eigenvalues > 1e-12]
+    min_positive_eigenvalue = float(np.min(positive_eigenvalues)) if positive_eigenvalues.size else np.nan
+
+    if not np.isfinite(max_eigenvalue) or not np.isfinite(min_positive_eigenvalue):
+        condition_index = np.nan
+    elif min_positive_eigenvalue <= 0:
+        condition_index = np.inf
+    else:
+        condition_index = float(np.sqrt(max_eigenvalue / min_positive_eigenvalue))
+    return condition_index, max_eigenvalue, min_positive_eigenvalue
+
+
+@_with_notebook_context
+def clinical_analysis_assess_domain_collinearity(
+    data,
+    meta=None,
+    preprocessed_modalities=None,
+    domain_col="Modality",
+    variable_col="ElementName",
+    id_cols=("src_subject_id", "phenotype"),
+    correlation_methods=("pearson", "spearman"),
+    high_corr_threshold=0.90,
+    moderate_corr_threshold=0.70,
+    min_pairwise_n=3,
+):
+    """Summarise within-domain collinearity for raw data or preprocessed modality matrices."""
+    id_cols = set(id_cols)
+    if preprocessed_modalities is not None:
+        domain_items = [
+            (domain_name, [c for c in df_mod.columns if c not in id_cols])
+            for domain_name, df_mod in preprocessed_modalities.items()
+        ]
+    else:
+        if meta is None:
+            raise ValueError("meta is required when preprocessed_modalities is not provided.")
+        required_cols = {domain_col, variable_col}
+        missing_meta_cols = required_cols.difference(meta.columns)
+        if missing_meta_cols:
+            raise KeyError(f"Missing metadata column(s): {sorted(missing_meta_cols)}")
+        domain_map = (
+            meta.loc[meta[variable_col].isin(data.columns), [variable_col, domain_col]]
+            .dropna(subset=[domain_col])
+            .drop_duplicates()
+            .rename(columns={variable_col: "variable", domain_col: "domain"})
+        )
+        domain_items = [
+            (domain_name, [v for v in domain_df["variable"].tolist() if v not in id_cols])
+            for domain_name, domain_df in domain_map.groupby("domain", sort=True)
+        ]
+    pair_rows = []
+    vif_rows = []
+    condition_rows = []
+    summary_rows = []
+    skipped_rows = []
+
+    for domain_name, variables in domain_items:
+        source_df = preprocessed_modalities[domain_name] if preprocessed_modalities is not None else data
+        X = clinical_analysis_prepare_numeric_domain_matrix(source_df, variables, min_pairwise_n=min_pairwise_n)
+        numeric_vars = X.columns.tolist()
+
+        for variable in sorted(set(variables).difference(numeric_vars)):
+            skipped_rows.append({
+                "domain": domain_name,
+                "variable": variable,
+                "reason": "not numeric/coercible or insufficient variation",
+            })
+
+        corr_counts = {method: 0 for method in correlation_methods}
+        corr_max = {method: np.nan for method in correlation_methods}
+        corr_mean = {method: np.nan for method in correlation_methods}
+
+        if len(numeric_vars) >= 2:
+            for method in correlation_methods:
+                corr = source_df[numeric_vars].apply(pd.to_numeric, errors="coerce").corr(
+                    method=method,
+                    min_periods=min_pairwise_n,
+                )
+                abs_corr = corr.abs()
+                upper_mask = np.triu(np.ones(abs_corr.shape, dtype=bool), k=1)
+                upper_values = abs_corr.where(upper_mask).stack().dropna()
+                flagged_pairs = upper_values[upper_values >= moderate_corr_threshold].sort_values(ascending=False)
+
+                corr_counts[method] = int((upper_values >= high_corr_threshold).sum())
+                corr_max[method] = upper_values.max() if len(upper_values) else np.nan
+                corr_mean[method] = upper_values.mean() if len(upper_values) else np.nan
+
+                for (variable_1, variable_2), abs_value in flagged_pairs.items():
+                    pair_rows.append({
+                        "domain": domain_name,
+                        "method": method,
+                        "variable_1": variable_1,
+                        "variable_2": variable_2,
+                        "correlation": corr.loc[variable_1, variable_2],
+                        "abs_correlation": abs_value,
+                        "correlation_level": clinical_analysis_pairwise_correlation_level(abs_value),
+                    })
+
+            vif_rows.extend(clinical_analysis_compute_vif_table(X, domain_name))
+            condition_index, max_eigenvalue, min_eigenvalue = clinical_analysis_compute_condition_index(X)
+        else:
+            condition_index, max_eigenvalue, min_eigenvalue = np.nan, np.nan, np.nan
+
+        condition_rows.append({
+            "domain": domain_name,
+            "condition_index": condition_index,
+            "condition_index_level": clinical_analysis_condition_index_level(condition_index),
+            "max_eigenvalue": max_eigenvalue,
+            "min_positive_eigenvalue": min_eigenvalue,
+        })
+
+        domain_vifs = [row["vif"] for row in vif_rows if row["domain"] == domain_name and np.isfinite(row["vif"])]
+        domain_tolerances = [row["tolerance"] for row in vif_rows if row["domain"] == domain_name and np.isfinite(row["tolerance"])]
+        summary_rows.append({
+            "domain": domain_name,
+            "n_variables_total": len(variables),
+            "n_variables_numeric": len(numeric_vars),
+            "n_severe_pearson_pairs_abs_r_ge_0_90": corr_counts.get("pearson", 0),
+            "n_severe_spearman_pairs_abs_r_ge_0_90": corr_counts.get("spearman", 0),
+            "max_abs_pearson": corr_max.get("pearson", np.nan),
+            "max_abs_spearman": corr_max.get("spearman", np.nan),
+            "mean_abs_pearson": corr_mean.get("pearson", np.nan),
+            "mean_abs_spearman": corr_mean.get("spearman", np.nan),
+            "max_vif": max(domain_vifs) if domain_vifs else np.nan,
+            "min_tolerance": min(domain_tolerances) if domain_tolerances else np.nan,
+            "n_variables_vif_ge_2_5": sum(v >= 2.5 for v in domain_vifs),
+            "n_variables_vif_ge_5": sum(v >= 5 for v in domain_vifs),
+            "n_variables_vif_ge_10": sum(v >= 10 for v in domain_vifs),
+            "condition_index": condition_index,
+            "condition_index_level": clinical_analysis_condition_index_level(condition_index),
+        })
+
+    summary = (
+        pd.DataFrame(summary_rows)
+        .sort_values(
+            ["n_severe_spearman_pairs_abs_r_ge_0_90", "max_vif", "condition_index", "domain"],
+            ascending=[False, False, False, True],
+        )
+        .reset_index(drop=True)
+    )
+    correlation_pairs = (
+        pd.DataFrame(pair_rows)
+        .sort_values(["abs_correlation", "domain", "method", "variable_1", "variable_2"], ascending=[False, True, True, True, True])
+        .reset_index(drop=True)
+        if pair_rows else
+        pd.DataFrame(columns=["domain", "method", "variable_1", "variable_2", "correlation", "abs_correlation", "correlation_level"])
+    )
+    vif_table = (
+        pd.DataFrame(vif_rows)
+        .sort_values(["vif", "domain", "variable"], ascending=[False, True, True])
+        .reset_index(drop=True)
+        if vif_rows else
+        pd.DataFrame(columns=["domain", "variable", "vif", "tolerance", "r_squared_with_other_variables", "vif_level"])
+    )
+    condition_index_table = (
+        pd.DataFrame(condition_rows)
+        .sort_values(["condition_index", "domain"], ascending=[False, True])
+        .reset_index(drop=True)
+        if condition_rows else
+        pd.DataFrame(columns=["domain", "condition_index", "condition_index_level", "max_eigenvalue", "min_positive_eigenvalue"])
+    )
+    skipped_variables = (
+        pd.DataFrame(skipped_rows)
+        .sort_values(["domain", "variable"])
+        .reset_index(drop=True)
+        if skipped_rows else
+        pd.DataFrame(columns=["domain", "variable", "reason"])
+    )
+
+    return {
+        "summary": summary,
+        "correlation_pairs": correlation_pairs,
+        "vif": vif_table,
+        "condition_index": condition_index_table,
+        "skipped_variables": skipped_variables,
+    }
+
+
+@_with_notebook_context
+def clinical_analysis_infer_notebook_profile():
+    """Infer the clinical profile using its original directory settings."""
+    return infer_notebook_profile_from_settings({
+        "clinical_paper": "clinical_paper",
+        "multiclust_extended": "multiclust_extended",
+        "prospect": "prospect",
+        "schizbull_legacy": "schizbull_legacy",
+    })
+
+
+@_with_notebook_context
+def clinical_analysis_display_merged_feature_name(feature):
+    """Process clinical analysis display merged feature name."""
+    text = str(feature)
+    if "::" in text:
+        modality, name = text.split("::", 1)
+        return f"{modality}: {display_feature_name(name)}"
+    return display_feature_name(text)
+
+
+@_with_notebook_context
+def clinical_analysis_add_metadata_and_clusters_individual_labels(final_metrics, data_full, mod_num):
+    """
+    Merge cluster labels into full metadata DataFrame using src_subject_id
+    from the actual training data stored in fold_metrics['data'].
+    This ensures correct alignment even when not all train_ids were clustered.
+    """
+    clusters = pd.Series(final_metrics['individual_labels'][mod_num])
+
+    # Get the first modality’s dataframe — all have the same subject order
+    modality_dfs = final_metrics.get('data', {})
+    if not modality_dfs:
+        raise ValueError("final_metrics['data'] is empty; cannot extract subject IDs.")
+
+    # Use the src_subject_id column from the first available modality
+    first_modality = list(modality_dfs.keys())[0]
+    subj_ids = modality_dfs[first_modality]['src_subject_id'].reset_index(drop=True)
+
+    # Sanity check: should match cluster array length
+    if len(subj_ids) != len(clusters):
+        print(f"⚠️ Mismatch: {len(subj_ids)} subject IDs vs {len(clusters)} cluster labels.")
+        min_len = min(len(subj_ids), len(clusters))
+        subj_ids = subj_ids.iloc[:min_len]
+        clusters = clusters.iloc[:min_len]
+        print(f"Trimmed both to {min_len} entries to align.")
+
+    # Build cluster mapping dataframe
+    cluster_df = pd.DataFrame({
+        'src_subject_id': subj_ids,
+        'Cluster': clusters
+    })
+
+    # Merge back into full metadata
+    merged = pd.merge(data_full, cluster_df, on='src_subject_id', how='left')
+
+    print(f"✅ Merged clusters for {merged['Cluster'].notna().sum()} subjects (out of {len(merged)} total).")
+    return merged
+
+
+@_with_notebook_context
+def clinical_analysis_chi_square_comparison_individual_labels(df, group_col, label_col, title_prefix):
+    """
+    Perform chi-square test and plot grouped bar chart.
+    """
+    # Drop missing values
+    df = df.dropna(subset=[group_col, label_col])
+
+    # Make a copy for plotting / stats so we can safely relabel
+    df_plot = df.copy()
+
+    # Rename 'HC' -> 'CC' only for phenotype (for plotting and stats)
+    if label_col == 'phenotype':
+        df_plot[label_col] = df_plot[label_col].replace({'HC': 'CC'})
+
+    # 1. Summarize counts
+    summary_df = (
+        df_plot.groupby([group_col, label_col])
+        .size()
+        .reset_index(name='n')
+    )
+
+    # 2. Chi-square test
+    tbl = pd.crosstab(df_plot[group_col], df_plot[label_col])
+    chi2, pval, dof, expected = chi2_contingency(tbl)
+    pval = round(pval, 3)
+
+    # 3. Grouped bar chart
+    plt.figure(figsize=(8, 6))
+    sns.barplot(
+        data=summary_df,
+        x=group_col,
+        y='n',
+        hue=label_col,
+        dodge=True
+    )
+    plt.title(f"{title_prefix}\n(Chi-square p = {pval})")
+    plt.xlabel("Cluster")
+    plt.ylabel("Count")
+    sns.despine()
+    plt.tight_layout()
+    plt.show()
+
+
+@_with_notebook_context
+def clinical_analysis_add_metadata_and_clusters_final_labels(final_metrics, data_full):
+    """
+    Merge cluster labels into full metadata DataFrame using src_subject_id
+    from the actual training data stored in fold_metrics['data'].
+    This ensures correct alignment even when not all train_ids were clustered.
+    """
+    clusters = pd.Series(final_metrics['final_labels'])
+
+    # Get the first modality’s dataframe — all have the same subject order
+    modality_dfs = final_metrics.get('data', {})
+    if not modality_dfs:
+        raise ValueError("final_metrics['data'] is empty; cannot extract subject IDs.")
+
+    # Use the src_subject_id column from the first available modality
+    first_modality = list(modality_dfs.keys())[0]
+    subj_ids = modality_dfs[first_modality]['src_subject_id'].reset_index(drop=True)
+
+    # Sanity check: should match cluster array length
+    if len(subj_ids) != len(clusters):
+        print(f"⚠️ Mismatch: {len(subj_ids)} subject IDs vs {len(clusters)} cluster labels.")
+        min_len = min(len(subj_ids), len(clusters))
+        subj_ids = subj_ids.iloc[:min_len]
+        clusters = clusters.iloc[:min_len]
+        print(f"Trimmed both to {min_len} entries to align.")
+
+    # Build cluster mapping dataframe
+    cluster_df = pd.DataFrame({
+        'src_subject_id': subj_ids,
+        'Cluster': clusters
+    })
+
+    # Merge back into full metadata
+    merged = pd.merge(data_full, cluster_df, on='src_subject_id', how='left')
+
+    print(f"✅ Merged clusters for {merged['Cluster'].notna().sum()} subjects (out of {len(merged)} total).")
+    return merged
+
+
+@_with_notebook_context
+def clinical_analysis_chi_square_comparison_final_labels(df, group_col, label_col, title_prefix, save_path):
+    """
+    Perform chi-square test and plot grouped bar chart.
+    """
+    # Drop missing values
+    df = df.dropna(subset=[group_col, label_col])
+
+    # Make a copy for plotting / stats so we can safely relabel
+    df_plot = df.copy()
+
+    # Rename 'HC' -> 'CC' only for phenotype (for plotting and stats)
+    if label_col == 'phenotype':
+        df_plot[label_col] = df_plot[label_col].replace({'HC': 'CC'})
+
+    # 1. Summarize counts
+    summary_df = (
+        df_plot.groupby([group_col, label_col])
+        .size()
+        .reset_index(name='n')
+    )
+
+    # 2. Chi-square test
+    tbl = pd.crosstab(df_plot[group_col], df_plot[label_col])
+    chi2, pval, dof, expected = chi2_contingency(tbl)
+    pval = round(pval, 3)
+
+    # 3. Grouped bar chart
+    plt.figure(figsize=(8, 6))
+    sns.barplot(
+        data=summary_df,
+        x=group_col,
+        y='n',
+        hue=label_col,
+        dodge=True
+    )
+    plt.title(f"{title_prefix}\n(Chi-square p = {pval})")
+    plt.xlabel("Cluster")
+    plt.ylabel("Count")
+    sns.despine()
+    plt.tight_layout()
+    clinical_analysis_save_figure_png_pdf(plt.gcf(), save_path, dpi=1000)
+    plt.show()
+
+    # 4. Cluster summary (including CHR percentage if relevant)
+    cluster_summary = (
+        df_plot.groupby(group_col)
+        .agg(
+            Size=(group_col, 'size'),
+            CHR_percentage=(
+                label_col,
+                lambda x: (x.eq('CHR').sum() / len(x)) * 100
+                if 'CHR' in x.values else None
+            )
+        )
+        .reset_index()
+        .sort_values(group_col)
+    )
+    print(f"\nCluster summary for {title_prefix}")
+    print(cluster_summary)
+    print("\n" + "-"*60)
+
+
+@_with_notebook_context
+def clinical_analysis_summarize_streams(df_paths, stage_order, top_k=20, sample_ids=10):
+    """Process clinical analysis summarize streams."""
+    group_cols = stage_order + ["final"]
+    total = len(df_paths)
+
+    g = (df_paths
+         .groupby(group_cols, dropna=False)
+         .agg(
+             n=("src_subject_id", "size"),
+             example_ids=("src_subject_id", lambda x: list(x.head(sample_ids))),
+         )
+         .reset_index()
+        )
+
+    g["pct"] = (g["n"] / total * 100).round(2)
+
+    # A readable "stream label"
+    def make_stream_label(row):
+        parts = [f"{c}={row[c]}" for c in stage_order] + [f"final={row['final']}"]
+        return " → ".join(parts)
+
+    g["stream"] = g.apply(make_stream_label, axis=1)
+
+    g = g.sort_values("n", ascending=False).head(top_k)
+
+    # Reorder columns nicely
+    cols = ["n", "pct", "stream", "example_ids"] + stage_order + ["final"]
+    return g[cols]
+
+
+@_with_notebook_context
+def clinical_analysis_safe_svm_plot_name(name):
+    """Process clinical analysis safe svm plot name."""
+    return re.sub(r"[^A-Za-z0-9_.-]+", "_", str(name)).strip("_") or "plot"
+
+
+@_with_notebook_context
+def clinical_analysis_save_svm_figure_png_svg(fig, filename, dpi=300, **savefig_kwargs):
+    """Process clinical analysis save svm figure png svg."""
+    output_stem = svm_plots_dir / Path(filename).stem
+    saved_paths = []
+    for suffix in (".png", ".svg"):
+        target = output_stem.with_suffix(suffix)
+        fig.savefig(target, dpi=dpi, **savefig_kwargs)
+        saved_paths.append(target)
+    return saved_paths
+
+
+@_with_notebook_context
+def clinical_analysis_iter_discovery_svm_results(final_metrics):
+    """Process clinical analysis iter discovery svm results."""
+    modality_names = list(final_metrics.get("data", {}).keys())
+    raw_results = final_metrics.get("svm_results_modalities", [])
+
+    if isinstance(raw_results, dict):
+        for mod_name in modality_names:
+            yield mod_name, raw_results.get(mod_name)
+        extra = [name for name in raw_results if name not in set(modality_names)]
+        if extra:
+            print("SVM modality results not present in final_metrics['data']:", extra)
+        return
+
+    raw_results = list(raw_results or [])
+    if len(raw_results) != len(modality_names):
+        print(
+            "Warning: svm_results_modalities has "
+            f"{len(raw_results)} entries for {len(modality_names)} discovery modalities. "
+            "Trailing modalities without stored SVM results will be reported explicitly."
+        )
+    for idx, mod_name in enumerate(modality_names):
+        res = raw_results[idx] if idx < len(raw_results) else None
+        yield mod_name, res
+
+
+@_with_notebook_context
+def clinical_analysis_plot_pred_modality(df, name):
+    """
+    Plots confidence/uncertainty diagnostics for a single modality DataFrame.
+    Expected columns (any subset is ok): p_0, p_1, confidence, entropy, margin
+    """
+    cols = set(df.columns)
+
+    # Compute missing fields if probabilities exist
+    if {"p_0", "p_1"}.issubset(cols):
+        p0 = df["p_0"].astype(float).to_numpy()
+        p1 = df["p_1"].astype(float).to_numpy()
+
+        if "confidence" not in cols:
+            df = df.copy()
+            df["confidence"] = np.maximum(p0, p1)
+
+        if "margin" not in cols:
+            df = df.copy()
+            df["margin"] = np.abs(p1 - p0)
+
+        if "entropy" not in cols:
+            df = df.copy()
+            eps = 1e-12
+            df["entropy"] = -(p0 * np.log(p0 + eps) + p1 * np.log(p1 + eps))
+
+    # Helper to plot a histogram if column exists
+    def hist_if_exists(col, bins=30, xlabel=None):
+        if col in df.columns:
+            fig = plt.figure()
+            plt.hist(df[col].dropna().astype(float), bins=bins)
+            plt.xlabel(xlabel or col)
+            plt.ylabel("Count")
+            plt.title(f"{name}: {col} distribution (unlabeled hold-out)")
+            clinical_analysis_save_svm_figure_png_svg(fig, f"holdout_{clinical_analysis_safe_svm_plot_name(name)}_{clinical_analysis_safe_svm_plot_name(col)}_distribution", dpi=300, bbox_inches="tight")
+            plt.show()
+
+    # 1) Histograms
+    hist_if_exists("p_1", xlabel="Predicted probability p(class=1)")
+    hist_if_exists("confidence", xlabel="Confidence = max(p_0, p_1)")
+    hist_if_exists("entropy", xlabel="Entropy (higher = more uncertain)")
+    hist_if_exists("margin", xlabel="Margin = |p_1 - p_0| (lower = more uncertain)")
+
+    # 2) Scatter plots that are often informative
+    if ("confidence" in df.columns) and ("entropy" in df.columns):
+        fig = plt.figure()
+        plt.scatter(df["confidence"].astype(float), df["entropy"].astype(float), s=10)
+        plt.xlabel("Confidence")
+        plt.ylabel("Entropy")
+        plt.title(f"{name}: confidence vs entropy")
+        clinical_analysis_save_svm_figure_png_svg(fig, f"holdout_{clinical_analysis_safe_svm_plot_name(name)}_confidence_vs_entropy", dpi=300, bbox_inches="tight")
+        plt.show()
+
+    if ("confidence" in df.columns) and ("margin" in df.columns):
+        fig = plt.figure()
+        plt.scatter(df["confidence"].astype(float), df["margin"].astype(float), s=10)
+        plt.xlabel("Confidence")
+        plt.ylabel("Margin")
+        plt.title(f"{name}: confidence vs margin")
+        clinical_analysis_save_svm_figure_png_svg(fig, f"holdout_{clinical_analysis_safe_svm_plot_name(name)}_confidence_vs_margin", dpi=300, bbox_inches="tight")
+        plt.show()
+
+    # 3) Print “most uncertain” cases (lowest confidence / lowest margin / highest entropy)
+    # (useful for manual review)
+    print(f"\n=== {name}: most uncertain examples ===")
+
+    if "confidence" in df.columns:
+        print("\nLowest confidence:")
+        display(df.sort_values("confidence", ascending=True).head(10))
+
+    if "margin" in df.columns:
+        print("\nLowest margin:")
+        display(df.sort_values("margin", ascending=True).head(10))
+
+    if "entropy" in df.columns:
+        print("\nHighest entropy:")
+        display(df.sort_values("entropy", ascending=False).head(10))
+
+
+@_with_notebook_context
+def clinical_analysis_add_metadata_and_clusters_validation_individual_labels(modality_data, data_full, mod_num):
+    """
+    Merge cluster labels into full metadata using src_subject_id from the
+    modality dataframe that was clustered. The notebook calls this function
+    once per modality, passing dict_final[modality].
+    """
+    clusters = pd.Series(labels_test_modalities[mod_num]).reset_index(drop=True)
+
+    if isinstance(modality_data, pd.DataFrame):
+        modality_df = modality_data
+    elif isinstance(modality_data, dict):
+        if len(modality_data) == 0:
+            raise ValueError("modality_data is empty; cannot extract subject IDs.")
+        first_modality = next(iter(modality_data))
+        modality_df = modality_data[first_modality]
+    else:
+        raise TypeError(
+            "modality_data must be a pandas DataFrame or a dict of modality DataFrames; "
+            f"got {type(modality_data).__name__}."
+        )
+
+    if modality_df.empty:
+        raise ValueError("modality_data is empty; cannot extract subject IDs.")
+    if "src_subject_id" not in modality_df.columns:
+        raise KeyError("modality_data must include a 'src_subject_id' column.")
+
+    subj_ids = modality_df["src_subject_id"].reset_index(drop=True)
+
+    # Sanity check: should match cluster array length
+    if len(subj_ids) != len(clusters):
+        print(f"Warning: {len(subj_ids)} subject IDs vs {len(clusters)} cluster labels.")
+        min_len = min(len(subj_ids), len(clusters))
+        subj_ids = subj_ids.iloc[:min_len]
+        clusters = clusters.iloc[:min_len]
+        print(f"Trimmed both to {min_len} entries to align.")
+
+    cluster_df = pd.DataFrame({
+        "src_subject_id": subj_ids,
+        "Cluster": clusters,
+    })
+
+    merged = pd.merge(data_full, cluster_df, on="src_subject_id", how="left")
+
+    print(f"Merged clusters for {merged['Cluster'].notna().sum()} subjects (out of {len(merged)} total).")
+    return merged
+
+
+@_with_notebook_context
+def clinical_analysis_chi_square_comparison_validation_individual_labels(df, group_col, label_col, title_prefix):
+    """
+    Perform chi-square test and plot grouped bar chart.
+    """
+    # Drop missing values
+    df = df.dropna(subset=[group_col, label_col])
+
+    # Make a copy for plotting / stats so we can safely relabel
+    df_plot = df.copy()
+
+    # Rename 'HC' -> 'CC' only for phenotype (for plotting and stats)
+    if label_col == 'phenotype':
+        df_plot[label_col] = df_plot[label_col].replace({'HC': 'CC'})
+
+    # 1. Summarize counts
+    summary_df = (
+        df_plot.groupby([group_col, label_col])
+        .size()
+        .reset_index(name='n')
+    )
+
+    # 2. Chi-square test
+    tbl = pd.crosstab(df_plot[group_col], df_plot[label_col])
+    chi2, pval, dof, expected = chi2_contingency(tbl)
+    pval = round(pval, 3)
+
+    # 3. Grouped bar chart
+    plt.figure(figsize=(8, 6))
+    sns.barplot(
+        data=summary_df,
+        x=group_col,
+        y='n',
+        hue=label_col,
+        dodge=True
+    )
+    plt.title(f"{title_prefix}\n(Chi-square p = {pval})")
+    plt.xlabel("Cluster")
+    plt.ylabel("Count")
+    sns.despine()
+    plt.tight_layout()
+    plt.show()
+
+
+@_with_notebook_context
+def clinical_analysis_as_domain_map_label_series(values, expected_n, label_name, sample_name):
+    """Process clinical analysis as domain map label series."""
+    series = pd.Series(values).astype(str).reset_index(drop=True)
+    if len(series) != expected_n:
+        raise ValueError(
+            f"{sample_name}: {label_name} has {len(series)} labels for {expected_n} subjects."
+        )
+    return series.str.replace(" ", "_", regex=False)
+
+
+@_with_notebook_context
+def clinical_analysis_domain_map_path_table(labels_by_modality, final_labels, sample_name, stage_order_for_labels, final_name="Integrated"):
+    """Process clinical analysis domain map path table."""
+    available_stages = [stage for stage in stage_order_for_labels if stage in labels_by_modality]
+    if not available_stages:
+        raise ValueError(f"{sample_name}: no domain labels were available for comparison.")
+
+    n_subjects = len(pd.Series(labels_by_modality[available_stages[0]]))
+    frame = pd.DataFrame({
+        stage: clinical_analysis_as_domain_map_label_series(labels_by_modality[stage], n_subjects, stage, sample_name)
+        for stage in available_stages
+    })
+    frame[final_name] = clinical_analysis_as_domain_map_label_series(final_labels, n_subjects, final_name, sample_name)
+    frame["domain_path"] = frame[available_stages].agg(" -> ".join, axis=1)
+    frame["integrated_path"] = frame[available_stages + [final_name]].agg(" -> ".join, axis=1)
+
+    path_table = (
+        frame.groupby(available_stages + [final_name, "domain_path", "integrated_path"], dropna=False)
+        .size()
+        .reset_index(name="n")
+        .sort_values("n", ascending=False, kind="mergesort")
+        .reset_index(drop=True)
+    )
+    path_table["sample"] = sample_name
+    path_table["proportion"] = path_table["n"] / float(n_subjects)
+    return frame, path_table, available_stages
+
+
+@_with_notebook_context
+def clinical_analysis_compare_domain_map_paths(discovery_table, validation_table, group_cols, label):
+    """Process clinical analysis compare domain map paths."""
+    discovery_counts = (
+        discovery_table.groupby(group_cols, dropna=False)["n"]
+        .sum()
+        .reset_index(name="n_discovery")
+    )
+    validation_counts = (
+        validation_table.groupby(group_cols, dropna=False)["n"]
+        .sum()
+        .reset_index(name="n_validation")
+    )
+    comparison = discovery_counts.merge(validation_counts, on=group_cols, how="outer").fillna(0)
+    comparison["n_discovery"] = comparison["n_discovery"].astype(int)
+    comparison["n_validation"] = comparison["n_validation"].astype(int)
+    comparison["proportion_discovery"] = comparison["n_discovery"] / max(1, int(discovery_table["n"].sum()))
+    comparison["proportion_validation"] = comparison["n_validation"] / max(1, int(validation_table["n"].sum()))
+    comparison["proportion_difference_validation_minus_discovery"] = (
+        comparison["proportion_validation"] - comparison["proportion_discovery"]
+    )
+    comparison["abs_proportion_difference"] = comparison[
+        "proportion_difference_validation_minus_discovery"
+    ].abs()
+    comparison["path_present_in"] = np.select(
+        [
+            comparison["n_discovery"].gt(0) & comparison["n_validation"].gt(0),
+            comparison["n_discovery"].gt(0),
+            comparison["n_validation"].gt(0),
+        ],
+        ["both", "discovery_only", "validation_only"],
+        default="neither",
+    )
+    comparison = comparison.sort_values(
+        ["abs_proportion_difference", "proportion_validation", "proportion_discovery"],
+        ascending=[False, False, False],
+        kind="mergesort",
+    ).reset_index(drop=True)
+    comparison.to_csv(
+        os.path.join(_DOMAIN_MAP_COMPARISON_DIR, f"{label}_domain_map_path_comparison.csv"),
+        index=False,
+    )
+    return comparison
+
+
+@_with_notebook_context
+def clinical_analysis_plot_domain_map_path_comparison(comparison, path_col, title, filename_prefix, top_n=25):
+    """Process clinical analysis plot domain map path comparison."""
+    plot_df = comparison.copy()
+    plot_df["max_proportion"] = plot_df[["proportion_discovery", "proportion_validation"]].max(axis=1)
+    plot_df = plot_df.sort_values("max_proportion", ascending=False, kind="mergesort").head(top_n)
+    if plot_df.empty:
+        print(f"Skipping {filename_prefix}: no paths available to plot.")
+        return None
+
+    plot_df = plot_df.sort_values("max_proportion", ascending=True, kind="mergesort")
+    y = np.arange(plot_df.shape[0])
+    bar_height = 0.38
+    fig_height = max(6, 0.34 * plot_df.shape[0] + 1.8)
+    fig, ax = plt.subplots(figsize=(12, fig_height))
+    ax.barh(y - bar_height / 2, plot_df["proportion_discovery"], height=bar_height, label="Discovery", color="#38699A")
+    ax.barh(y + bar_height / 2, plot_df["proportion_validation"], height=bar_height, label="Validation", color="#B36F9C")
+    ax.set_yticks(y)
+    ax.set_yticklabels(plot_df[path_col], fontsize=8)
+    ax.set_xlabel("Sample proportion")
+    ax.set_title(title)
+    ax.legend(frameon=False, loc="lower right")
+    ax.grid(axis="x", alpha=0.25)
+    fig.tight_layout()
+
+    output_stem = os.path.join(_DOMAIN_MAP_COMPARISON_DIR, filename_prefix)
+    fig.savefig(output_stem + ".png", dpi=300, bbox_inches="tight")
+    fig.savefig(output_stem + ".pdf", bbox_inches="tight")
+    print("Saved:", output_stem + ".png")
+    print("Saved:", output_stem + ".pdf")
+    return fig
+
+
+@_with_notebook_context
+def clinical_analysis_parse_stream(stream_str):
+    """
+    Parse stream like:
+      "Psychoticism=low_severity → Detachment=high_severity → ... → final=1"
+    into ordered list of (domain, label).
+    """
+    if pd.isna(stream_str):
+        return []
+    parts = [p.strip() for p in ARROW_PAT.split(str(stream_str).strip()) if p.strip()]
+    out = []
+    for p in parts:
+        if "=" in p:
+            dom, lab = p.split("=", 1)
+            out.append((dom.strip(), lab.strip()))
+        else:
+            out.append((p.strip(), "<NA>"))
+    return out
+
+
+@_with_notebook_context
+def clinical_analysis_infer_stage_order(df, stream_col="stream"):
+    """
+    Infer stage order from the first non-null stream.
+    Assumes all streams follow the same domain order.
+    """
+    s = df[stream_col].dropna().astype(str)
+    if s.empty:
+        raise ValueError("No streams found to infer stage order.")
+    path = clinical_analysis_parse_stream(s.iloc[0])
+    return [d for d, _ in path]
+
+
+@_with_notebook_context
+def clinical_analysis_normalize(v, eps=1e-12):
+    """Process clinical analysis normalize."""
+    v = np.asarray(v, dtype=float)
+    s = v.sum()
+    if s <= 0:
+        return np.ones_like(v) / max(1, len(v))
+    return v / (s + eps)
+
+
+@_with_notebook_context
+def clinical_analysis_build_prefix_next(df, stream_col="stream", n_col="n"):
+    """
+    Returns:
+      prefix_next: dict[prefix_tuple_of_(domain,label)] -> dict[next_token_(domain,label)|<END>] -> weight
+      prefix_mass: dict[prefix] -> total weight passing through prefix
+    Where prefix is a tuple of (domain,label) tokens, e.g.:
+      prefix = (("Psychoticism","low_severity"), ("Detachment","high_severity"))
+    and next token is the next (domain,label) or "<END>".
+    """
+    prefix_next = {}
+    prefix_mass = {}
+
+    for _, row in df.iterrows():
+        w = float(row.get(n_col, 1.0))
+        path = clinical_analysis_parse_stream(row[stream_col])
+        if not path:
+            continue
+
+        # For each prefix (including empty prefix), record what comes next
+        for i in range(len(path)):
+            prefix = tuple(path[:i])  # empty prefix for i=0
+            nxt = path[i]             # next token
+            prefix_mass[prefix] = prefix_mass.get(prefix, 0.0) + w
+            d = prefix_next.setdefault(prefix, {})
+            d[nxt] = d.get(nxt, 0.0) + w
+
+        # terminal transition from full path to END
+        full_prefix = tuple(path)
+        prefix_mass[full_prefix] = prefix_mass.get(full_prefix, 0.0) + w
+        d = prefix_next.setdefault(full_prefix, {})
+        d["<END>"] = d.get("<END>", 0.0) + w
+
+    return prefix_next, prefix_mass
+
+
+@_with_notebook_context
+def clinical_analysis_compare_prefix_structure(df_disc, df_test, stream_col="stream", n_col="n", eps=1e-12):
+    """
+    For each prefix, compare the conditional distribution over next tokens:
+        P_disc(next | prefix)  vs  P_test(next | prefix)
+
+    Returns DataFrame with:
+      - prefix_str
+      - depth
+      - js_next (Jensen–Shannon distance on next-step distributions)
+      - mass_disc / mass_test (how much data passes through prefix; useful for weighting but not "size-equality")
+      - top_next_disc / top_next_test (most likely next step)
+      - support_next_overlap (Jaccard on next-token supports)
+    """
+    pn_d, pm_d = clinical_analysis_build_prefix_next(df_disc, stream_col, n_col)
+    pn_t, pm_t = clinical_analysis_build_prefix_next(df_test, stream_col, n_col)
+
+    prefixes = set(pn_d.keys()) | set(pn_t.keys())
+
+    rows = []
+    for pref in prefixes:
+        nd = pn_d.get(pref, {})
+        nt = pn_t.get(pref, {})
+
+        keys = set(nd.keys()) | set(nt.keys())
+        # Align next-token vectors
+        vd = np.array([nd.get(k, 0.0) for k in keys], dtype=float)
+        vt = np.array([nt.get(k, 0.0) for k in keys], dtype=float)
+
+        pd_ = clinical_analysis_normalize(vd, eps=eps)
+        pt_ = clinical_analysis_normalize(vt, eps=eps)
+
+        js = float(jensenshannon(pd_ + eps, pt_ + eps, base=2.0))
+
+        # Next-token support overlap (presence/absence, structure)
+        supp_d = {k for k, v in nd.items() if v > 0}
+        supp_t = {k for k, v in nt.items() if v > 0}
+        supp_j = len(supp_d & supp_t) / max(1, len(supp_d | supp_t))
+
+        # Most likely next token in each
+        top_d = max(nd.items(), key=lambda x: x[1])[0] if nd else None
+        top_t = max(nt.items(), key=lambda x: x[1])[0] if nt else None
+
+        def tok_str(tok):
+            if tok == "<END>":
+                return "<END>"
+            if tok is None:
+                return "<NONE>"
+            return f"{tok[0]}={tok[1]}"
+
+        prefix_str = " → ".join([f"{d}={l}" for d, l in pref]) if pref else "<START>"
+        rows.append({
+            "prefix_str": prefix_str,
+            "depth": len(pref),
+            "js_next": js,
+            "mass_disc": pm_d.get(pref, 0.0),
+            "mass_test": pm_t.get(pref, 0.0),
+            "top_next_disc": tok_str(top_d),
+            "top_next_test": tok_str(top_t),
+            "support_next_jaccard": supp_j,
+            "prefix_exists_in_disc": pref in pn_d,
+            "prefix_exists_in_test": pref in pn_t,
+        })
+
+    out = pd.DataFrame(rows)
+    # A useful default sorting: prioritize structurally-different AND commonly-used prefixes
+    out["mass_min"] = np.minimum(out["mass_disc"], out["mass_test"])
+    out = out.sort_values(["mass_min", "js_next"], ascending=[False, False]).reset_index(drop=True)
+    return out
+
+
+@_with_notebook_context
+def clinical_analysis_plot_top_prefix_differences(prefix_report, top_n=20, min_depth=1):
+    """
+    Barh plot of top prefixes by JS(next) after filtering.
+    """
+    d = prefix_report[prefix_report["depth"] >= min_depth].copy()
+    d = d.sort_values("js_next", ascending=False).head(top_n)
+
+    plt.figure(figsize=(11, max(4, 0.35 * len(d))))
+    y = np.arange(len(d))[::-1]
+    plt.barh(y, d["js_next"].iloc[::-1].to_numpy())
+    plt.yticks(y, d["prefix_str"].iloc[::-1].to_list(), fontsize=9)
+    plt.xlabel("Jensen–Shannon distance of P(next | prefix)")
+    plt.title("Most structurally different prefixes (next-step rule)")
+    plt.tight_layout()
+    plt.show()
+
+
+@_with_notebook_context
+def clinical_analysis_final_mapping_table(df, stream_col="stream", n_col="n", final_domain="final"):
+    """
+    Builds a table over modality-prefixes (everything up to but excluding final)
+    with P(final=label | prefix) computed within each dataset.
+
+    Returns DataFrame:
+      prefix_str, final_label, weight
+    and also a pivoted table of P(final=...) by prefix.
+    """
+    rows = []
+    for _, row in df.iterrows():
+        w = float(row.get(n_col, 1.0))
+        path = clinical_analysis_parse_stream(row[stream_col])
+        if not path:
+            continue
+
+        # split into prefix (before final) and final token
+        final_tokens = [t for t in path if t[0] == final_domain]
+        if not final_tokens:
+            # If final isn't explicitly present, skip
+            continue
+        final_tok = final_tokens[-1]  # in case of duplicates, take last
+        final_label = final_tok[1]
+
+        # prefix = all tokens before the final token position (first occurrence)
+        # more robust: take all tokens except the final-domain token(s)
+        prefix = tuple([t for t in path if t[0] != final_domain])
+
+        prefix_str = " → ".join([f"{d}={l}" for d, l in prefix]) if prefix else "<NO_MODALITIES>"
+        rows.append({"prefix_str": prefix_str, "final_label": final_label, "w": w})
+
+    long = pd.DataFrame(rows)
+    if long.empty:
+        return long, pd.DataFrame()
+
+    # Compute conditional probabilities P(final_label | prefix)
+    grp = long.groupby(["prefix_str", "final_label"], dropna=False)["w"].sum().reset_index()
+    totals = grp.groupby("prefix_str")["w"].sum().reset_index().rename(columns={"w": "w_total"})
+    grp = grp.merge(totals, on="prefix_str", how="left")
+    grp["p_final_given_prefix"] = grp["w"] / grp["w_total"]
+
+    pivot = grp.pivot_table(index="prefix_str", columns="final_label", values="p_final_given_prefix", fill_value=0.0)
+    return grp, pivot
+
+
+@_with_notebook_context
+def clinical_analysis_compare_final_mapping(df_disc, df_test, stream_col="stream", n_col="n", final_domain="final"):
+    """
+    Compare P(final | modalities) between discovery and test.
+    Returns a table with per-prefix deltas per final label plus summary metrics.
+    """
+    long_d, piv_d = clinical_analysis_final_mapping_table(df_disc, stream_col, n_col, final_domain)
+    long_t, piv_t = clinical_analysis_final_mapping_table(df_test, stream_col, n_col, final_domain)
+
+    empty_out = pd.DataFrame(columns=["prefix_str", "js_final_given_prefix", "w_disc", "w_test", "w_min"])
+    if piv_d.empty or piv_t.empty:
+        return empty_out, {"note": "No final mapping found (missing final tokens?)", "num_prefixes_union": 0}
+
+    # align
+    idx = sorted(set(piv_d.index) | set(piv_t.index))
+    cols = sorted(set(piv_d.columns) | set(piv_t.columns))
+    A = piv_d.reindex(index=idx, columns=cols).fillna(0.0)
+    B = piv_t.reindex(index=idx, columns=cols).fillna(0.0)
+
+    # Delta per final label
+    delta = (B - A)
+    out = delta.copy()
+    out.columns = [f"delta_final={c}" for c in out.columns]
+    out.insert(0, "prefix_str", out.index)
+
+    # A per-prefix summary: JS distance between final distributions for that prefix
+    js_list = []
+    for i in range(A.shape[0]):
+        p = clinical_analysis_normalize(A.iloc[i].to_numpy())
+        q = clinical_analysis_normalize(B.iloc[i].to_numpy())
+        js_list.append(float(jensenshannon(p + 1e-12, q + 1e-12, base=2.0)))
+    out["js_final_given_prefix"] = js_list
+
+    # Add weights: how common the prefix is (within each dataset)
+    wD = long_d.groupby("prefix_str")["w"].sum() if not long_d.empty else pd.Series(dtype=float)
+    wT = long_t.groupby("prefix_str")["w"].sum() if not long_t.empty else pd.Series(dtype=float)
+    out["w_disc"] = out["prefix_str"].map(wD).fillna(0.0)
+    out["w_test"] = out["prefix_str"].map(wT).fillna(0.0)
+    out["w_min"] = np.minimum(out["w_disc"], out["w_test"])
+
+    # Sort by (common prefixes) then by biggest JS shift in final mapping
+    out = out.sort_values(["w_min", "js_final_given_prefix"], ascending=[False, False]).reset_index(drop=True)
+
+    # Global summary metric: weighted average JS over prefixes (weights = w_min)
+    w = out["w_min"].to_numpy()
+    if w.sum() > 0:
+        global_js = float(np.sum(out["js_final_given_prefix"].to_numpy() * w) / w.sum())
+    else:
+        global_js = float(out["js_final_given_prefix"].mean())
+
+    metrics = {
+        "num_prefixes_union": len(out),
+        "weighted_js_final_given_prefix": global_js,
+        "final_labels": cols,
+    }
+    return out, metrics
+
+
+@_with_notebook_context
+def clinical_analysis_plot_top_final_mapping_shifts(final_cmp, top_n=20):
+    """Process clinical analysis plot top final mapping shifts."""
+    required = {"prefix_str", "js_final_given_prefix"}
+    if final_cmp is None or final_cmp.empty:
+        print("No final-mapping shifts to plot.")
+        return None
+    missing = required - set(final_cmp.columns)
+    if missing:
+        print(f"No final-mapping shifts to plot; missing columns: {sorted(missing)}")
+        return None
+    d = final_cmp.head(top_n).copy()
+    plt.figure(figsize=(11, max(4, 0.35 * len(d))))
+    y = np.arange(len(d))[::-1]
+    plt.barh(y, d["js_final_given_prefix"].iloc[::-1].to_numpy())
+    plt.yticks(y, d["prefix_str"].iloc[::-1].to_list(), fontsize=9)
+    plt.xlabel("JS distance between P(final | prefix) in test vs discovery")
+    plt.title("Prefixes with biggest changes in final mapping")
+    plt.tight_layout()
+    plt.show()
+
+
+@_with_notebook_context
+def clinical_analysis_stream_presence_and_topk(df_disc, df_test, stream_col="stream", n_col="n", topk=30):
+    """Process clinical analysis stream presence and topk."""
+    A = set(df_disc[stream_col].dropna().astype(str))
+    B = set(df_test[stream_col].dropna().astype(str))
+
+    presence = {
+        "unique_streams_disc": len(A),
+        "unique_streams_test": len(B),
+        "stream_jaccard_presence": len(A & B) / max(1, len(A | B)),
+        "coverage_disc_in_test": len(A & B) / max(1, len(A)),
+        "coverage_test_in_disc": len(A & B) / max(1, len(B)),
+    }
+
+    pD = df_disc.groupby(stream_col)[n_col].sum().sort_values(ascending=False)
+    pT = df_test.groupby(stream_col)[n_col].sum().sort_values(ascending=False)
+    pD = pD / pD.sum()
+    pT = pT / pT.sum()
+
+    topD = set(pD.index[: min(topk, len(pD))].astype(str))
+    topT = set(pT.index[: min(topk, len(pT))].astype(str))
+
+    presence[f"top{topk}_jaccard_by_rank"] = len(topD & topT) / max(1, len(topD | topT))
+    presence["top_disc_only"] = sorted(list(topD - topT))[:10]
+    presence["top_test_only"] = sorted(list(topT - topD))[:10]
+    return presence, pD, pT
+
+
+@_with_notebook_context
+def clinical_analysis_sankey_from_streams(df, stream_col="stream", n_col="n", max_edges=200):
+    """
+    Build a Sankey graph from full streams.
+    Nodes are stage-specific label tokens: f"{domain}={label}".
+    Edges connect consecutive tokens. We prune to max_edges by weight.
+    """
+    if not _HAS_PLOTLY:
+        raise RuntimeError("Plotly not installed; cannot draw sankey.")
+
+    edge_w = {}
+    for _, row in df.iterrows():
+        w = float(row.get(n_col, 1.0))
+        path = clinical_analysis_parse_stream(row[stream_col])
+        toks = [f"{d}={l}" for d, l in path]
+        for a, b in zip(toks[:-1], toks[1:]):
+            edge_w[(a, b)] = edge_w.get((a, b), 0.0) + w
+
+    # prune
+    edges = sorted(edge_w.items(), key=lambda x: -x[1])[:max_edges]
+    nodes = {}
+    def nid(x):
+        if x not in nodes:
+            nodes[x] = len(nodes)
+        return nodes[x]
+
+    src, tgt, val = [], [], []
+    for (a, b), w in edges:
+        src.append(nid(a))
+        tgt.append(nid(b))
+        val.append(w)
+
+    labels = [None] * len(nodes)
+    for k, i in nodes.items():
+        labels[i] = k
+
+    fig = go.Figure(data=[go.Sankey(
+        node=dict(label=labels, pad=12, thickness=12),
+        link=dict(source=src, target=tgt, value=val),
+    )])
+    return fig
+
+
+@_with_notebook_context
+def clinical_analysis_full_structure_report(stream_summary, stream_summary_test, stream_col="stream", n_col="n", topk=30, final_domain="final"):
+    # Presence + top-k overlap
+    """Process clinical analysis full structure report."""
+    presence, pD, pT = clinical_analysis_stream_presence_and_topk(stream_summary, stream_summary_test, stream_col, n_col, topk=topk)
+
+    # Prefix-tree structural differences
+    prefix_report = clinical_analysis_compare_prefix_structure(stream_summary, stream_summary_test, stream_col, n_col)
+
+    # Full mapping to final
+    final_cmp, final_metrics = clinical_analysis_compare_final_mapping(stream_summary, stream_summary_test, stream_col, n_col, final_domain)
+
+    return {
+        "presence_metrics": presence,
+        "p_stream_disc": pD,
+        "p_stream_test": pT,
+        "prefix_report": prefix_report,
+        "final_mapping_compare": final_cmp,
+        "final_mapping_metrics": final_metrics,
+    }
+
+
+@_with_notebook_context
+def clinical_analysis_summarize_streams_for_comparison(df_paths, stage_order, top_k=100, sample_ids=12, final_col="final"):
+    """Build canonical stream labels for discovery/test comparison."""
+    group_cols = list(stage_order) + ([final_col] if final_col in df_paths.columns else [])
+    total = len(df_paths)
+
+    g = (
+        df_paths
+        .groupby(group_cols, dropna=False)
+        .agg(
+            n=("src_subject_id", "size"),
+            example_ids=("src_subject_id", lambda x: list(x.head(sample_ids))),
+        )
+        .reset_index()
+    )
+    g["pct"] = (g["n"] / total * 100).round(2) if total else 0.0
+
+    def make_stream_label(row):
+        parts = [f"{stage}={row[stage]}" for stage in stage_order]
+        if final_col in row.index:
+            parts.append(f"{final_col}={row[final_col]}")
+        return " → ".join(parts)
+
+    g["stream"] = g.apply(make_stream_label, axis=1)
+    g = g.sort_values("n", ascending=False).head(top_k)
+
+    cols = ["n", "pct", "stream", "example_ids"] + group_cols
+    return g[cols]
+
+
+@_with_notebook_context
+def clinical_analysis_all_streams_table(stream_summary, stream_summary_test, stream_col="stream", n_col="n"):
+    # Aggregate in case there are duplicate stream rows
+    """Process clinical analysis all streams table."""
+    disc = (stream_summary
+            .groupby(stream_col, dropna=False)[n_col]
+            .sum()
+            .rename("n_disc")
+            .to_frame())
+
+    test = (stream_summary_test
+            .groupby(stream_col, dropna=False)[n_col]
+            .sum()
+            .rename("n_test")
+            .to_frame())
+
+    # Outer join gives union of streams
+    tbl = disc.join(test, how="outer").fillna(0)
+
+    # Add proportions within each dataset
+    N_disc = tbl["n_disc"].sum()
+    N_test = tbl["n_test"].sum()
+
+    tbl["p_disc"] = tbl["n_disc"] / N_disc if N_disc > 0 else np.nan
+    tbl["p_test"] = tbl["n_test"] / N_test if N_test > 0 else np.nan
+
+    # Helpful comparisons
+    tbl["delta_p"] = tbl["p_test"] - tbl["p_disc"]
+    tbl["abs_delta_p"] = tbl["delta_p"].abs()
+    tbl["log2_fc"] = np.log2((tbl["p_test"] + 1e-12) / (tbl["p_disc"] + 1e-12))
+
+    # Make stream a real column, sort by biggest shift
+    tbl = tbl.reset_index().rename(columns={stream_col: "stream"})
+    tbl = tbl.sort_values("abs_delta_p", ascending=False).reset_index(drop=True)
+
+    return tbl
+
+
+@_with_notebook_context
+def clinical_analysis_subgroup_display_label(name):
+    """Process clinical analysis subgroup display label."""
+    return SUBGROUP_DISPLAY_LABELS.get(str(name), str(name).replace("_", " "))
+
+
+@_with_notebook_context
+def clinical_analysis_subject_ids_from_modality(data_by_modality, stage_order, subject_id_column="src_subject_id"):
+    """Process clinical analysis subject ids from modality."""
+    first_stage = stage_order[0]
+    if first_stage not in data_by_modality:
+        raise KeyError(f"Missing {first_stage} in modality data.")
+    return data_by_modality[first_stage][subject_id_column].astype(str).reset_index(drop=True)
+
+
+@_with_notebook_context
+def clinical_analysis_build_label_frame_from_current_objects(sample):
+    """Fallback only: rebuild labels if the saved release label CSV is unavailable."""
+    if sample == "discovery":
+        if "df_paths" in globals():
+            label_df = df_paths.copy()
+        else:
+            subject_ids = clinical_analysis_subject_ids_from_modality(final_metrics["data"], stage_order)
+            label_df = pd.DataFrame({"src_subject_id": subject_ids})
+            for stage in stage_order:
+                label_df[stage] = pd.Series(new_labels_by_modality[stage]).astype(str).reset_index(drop=True)
+            label_df["final"] = pd.Series(final_metrics["final_labels"]).astype(str).reset_index(drop=True)
+    elif sample == "test":
+        if "df_paths_test" in globals():
+            label_df = df_paths_test.copy()
+        else:
+            subject_ids = clinical_analysis_subject_ids_from_modality(dict_final, stage_order)
+            label_df = pd.DataFrame({"src_subject_id": subject_ids})
+            for stage in stage_order:
+                label_df[stage] = pd.Series(new_test_labels_by_modality[stage]).astype(str).reset_index(drop=True)
+            label_df["final"] = pd.Series(labels_test_final).astype(str).reset_index(drop=True)
+    else:
+        raise ValueError("sample must be 'discovery' or 'test'")
+
+    keep = ["src_subject_id"] + [c for c in SUBGROUP_VARS if c in label_df.columns]
+    label_df = label_df[keep].copy()
+    label_df["src_subject_id"] = label_df["src_subject_id"].astype(str)
+    return label_df
+
+
+@_with_notebook_context
+def clinical_analysis_load_saved_label_frame(path, sample):
+    """Match the Rmd: read the saved label CSVs produced by the final label-export cell."""
+    if path.exists():
+        label_df = pd.read_csv(path)
+        source = str(path)
+    else:
+        print(f"WARNING: {path} does not exist; rebuilding {sample} labels from current notebook objects.")
+        label_df = clinical_analysis_build_label_frame_from_current_objects(sample)
+        label_df.to_csv(path, index=False)
+        source = f"rebuilt and saved to {path}"
+
+    required = ["src_subject_id"] + SUBGROUP_VARS
+    missing = [col for col in required if col not in label_df.columns]
+    if missing:
+        raise KeyError(f"{sample} labels are missing required columns: {missing}. Source: {source}")
+
+    label_df = label_df[required].copy()
+    label_df["src_subject_id"] = label_df["src_subject_id"].astype(str)
+    for col in SUBGROUP_VARS:
+        label_df[col] = label_df[col].astype(str)
+    print(f"Loaded {sample} labels from {source}: {label_df.shape}")
+    return label_df
+
+
+@_with_notebook_context
+def clinical_analysis_resolve_post_analysis_data():
+    """Return the raw merged dataframe used by the Rmd as `merged_data`."""
+    for name in ["merged_data", "data_all", "data"]:
+        obj = globals().get(name)
+        if isinstance(obj, pd.DataFrame) and "src_subject_id" in obj.columns:
+            print(f"Using `{name}` as the Rmd-style merged_data dataframe.")
+            return obj.copy()
+
+    merged_path = Path(
+        "path/to/"
+        "multiclust_data/merged_data.csv"
+    )
+    if merged_path.exists():
+        print(f"Reloading Rmd-style merged_data from {merged_path}.")
+        return pd.read_csv(merged_path)
+
+    available = {
+        name: type(globals().get(name)).__name__
+        for name in ["merged_data", "data_all", "data"]
+        if name in globals()
+    }
+    raise KeyError(
+        "Could not find the Rmd-style merged_data dataframe with `src_subject_id`. "
+        f"Available candidates: {available}"
+    )
+
+
+@_with_notebook_context
+def clinical_analysis_bh_fdr(pvalues):
+    """Adjust p-values using the clinical notebook's coercion policy."""
+    return adjust_pvalues_benjamini_hochberg(pvalues, coerce_numeric=True)
+
+
+@_with_notebook_context(default_expressions={'dictionary_path': 'DICTIONARY_DIR_DIFF'})
+def clinical_analysis_load_dictionary_labels(dictionary_path=None):
+    """Process clinical analysis load dictionary labels."""
+    try:
+        d = pd.read_excel(dictionary_path)
+    except Exception as exc:
+        print(f"Could not read dictionary at {dictionary_path}: {exc}")
+        return {}, []
+    name_col = "ElementName" if "ElementName" in d.columns else d.columns[0]
+    label_col = next((c for c in ["ElementDescription", "Description", "Label", "Variable", "VariableName"] if c in d.columns), name_col)
+    labels = dict(zip(d[name_col].astype(str), d[label_col].astype(str)))
+    ordered = [v for v in d[name_col].astype(str).tolist()]
+    return labels, ordered
+
+
+@_with_notebook_context
+def clinical_analysis_metadata_variable_table(meta_df=None):
+    """Process clinical analysis metadata variable table."""
+    global _METADATA_VARIABLE_TABLE_CACHE
+    use_cache = meta_df is None
+    if use_cache and _METADATA_VARIABLE_TABLE_CACHE is not None:
+        return _METADATA_VARIABLE_TABLE_CACHE.copy()
+    meta_df = globals().get("meta") if meta_df is None else meta_df
+    if not isinstance(meta_df, pd.DataFrame) or "ElementName" not in meta_df.columns:
+        table = pd.DataFrame(columns=["canonical_variable", "Modality", "meta_row"])
+    else:
+        keep_columns = [column for column in ["ElementName", "Modality"] if column in meta_df.columns]
+        table = meta_df[keep_columns].copy().reset_index().rename(columns={"index": "meta_row"})
+        table["canonical_variable"] = table["ElementName"].astype(str)
+        table["Modality"] = table.get("Modality", pd.Series("Other / Unmapped", index=table.index)).fillna("Other / Unmapped").astype(str)
+        table = table.loc[~table["canonical_variable"].isin(HEATMAP_EXCLUDED_VARIABLES)]
+        table = table.drop_duplicates("canonical_variable", keep="first")[["canonical_variable", "Modality", "meta_row"]]
+    if use_cache:
+        _METADATA_VARIABLE_TABLE_CACHE = table.copy()
+    return table
+
+
+@_with_notebook_context(default_expressions={'dictionary_path': 'DICTIONARY_DIR_DIFF'})
+def clinical_analysis_dictionary_alias_table(dictionary_path=None):
+    """Process clinical analysis dictionary alias table."""
+    cache_key = str(dictionary_path)
+    if cache_key in _DICTIONARY_ALIAS_TABLE_CACHE:
+        return _DICTIONARY_ALIAS_TABLE_CACHE[cache_key].copy()
+    try:
+        dict_df = pd.read_excel(dictionary_path)
+    except Exception:
+        out = pd.DataFrame(columns=["variable", "canonical_variable", "alias_priority"])
+        _DICTIONARY_ALIAS_TABLE_CACHE[cache_key] = out.copy()
+        return out
+    if "ElementName" not in dict_df.columns:
+        out = pd.DataFrame(columns=["variable", "canonical_variable", "alias_priority"])
+        _DICTIONARY_ALIAS_TABLE_CACHE[cache_key] = out.copy()
+        return out
+    rows = []
+    for _, row in dict_df.iterrows():
+        canonical = str(row["ElementName"]) if pd.notna(row["ElementName"]) else ""
+        if not canonical:
+            continue
+        rows.append({"variable": canonical, "canonical_variable": canonical, "alias_priority": 0})
+        if "Aliases" in dict_df.columns and pd.notna(row.get("Aliases")):
+            for alias in re.split(r"[;|,\n\r]+", str(row.get("Aliases"))):
+                alias = alias.strip()
+                if alias:
+                    rows.append({"variable": alias, "canonical_variable": canonical, "alias_priority": 1})
+    if not rows:
+        out = pd.DataFrame(columns=["variable", "canonical_variable", "alias_priority"])
+    else:
+        out = pd.DataFrame(rows).drop_duplicates(["variable", "canonical_variable"], keep="first")
+    _DICTIONARY_ALIAS_TABLE_CACHE[cache_key] = out.copy()
+    return out
+
+
+@_with_notebook_context
+def clinical_analysis_variable_canonical_lookup(meta_df=None):
+    """Process clinical analysis variable canonical lookup."""
+    global _VARIABLE_CANONICAL_LOOKUP_CACHE
+    use_cache = meta_df is None
+    if use_cache and _VARIABLE_CANONICAL_LOOKUP_CACHE is not None:
+        return dict(_VARIABLE_CANONICAL_LOOKUP_CACHE)
+    meta_table = clinical_analysis_metadata_variable_table(meta_df)
+    meta_canonicals = set(meta_table["canonical_variable"])
+    alias_table = clinical_analysis_dictionary_alias_table()
+    if meta_canonicals:
+        alias_table = alias_table.loc[alias_table["canonical_variable"].isin(meta_canonicals)].copy()
+    direct = pd.DataFrame({
+        "variable": meta_table["canonical_variable"],
+        "canonical_variable": meta_table["canonical_variable"],
+        "alias_priority": 0,
+    })
+    lookup = pd.concat([direct, alias_table], ignore_index=True)
+    if lookup.empty:
+        out = {}
+    else:
+        lookup = lookup.sort_values(["variable", "alias_priority"]).drop_duplicates("variable", keep="first")
+        out = dict(zip(lookup["variable"].astype(str), lookup["canonical_variable"].astype(str)))
+    if use_cache:
+        _VARIABLE_CANONICAL_LOOKUP_CACHE = dict(out)
+    return out
+
+
+@_with_notebook_context
+def clinical_analysis_label_for_variable(variable):
+    """Process clinical analysis label for variable."""
+    canonical = clinical_analysis_variable_canonical_lookup().get(str(variable), str(variable))
+    if "display_feature_name" in globals():
+        return display_feature_name(canonical)
+    return canonical
+
+
+@_with_notebook_context
+def clinical_analysis_analysis_variables(df, comparison_cols=None, prefer_dictionary=True):
+    """Process clinical analysis analysis variables."""
+    comparison_cols = set(comparison_cols or [])
+    blocked = {
+        "src_subject_id", "sample", "phenotype", "Site", "sites", "chrrecruit",
+        *HEATMAP_EXCLUDED_VARIABLES, *SUBGROUP_VARS, *comparison_cols,
+    }
+    available = {str(c) for c in df.columns if str(c) not in blocked}
+    canonical_lookup = clinical_analysis_variable_canonical_lookup()
+    meta_table = clinical_analysis_metadata_variable_table()
+    variables = []
+    used_canonicals = set()
+
+    if not meta_table.empty:
+        alias_by_canonical = {}
+        for alias, canonical in canonical_lookup.items():
+            alias_by_canonical.setdefault(canonical, []).append(alias)
+        for canonical in meta_table["canonical_variable"]:
+            candidates = [canonical] + sorted(alias_by_canonical.get(canonical, []))
+            chosen = next((candidate for candidate in candidates if candidate in available), None)
+            if chosen is None or canonical in used_canonicals:
+                continue
+            variables.append(chosen)
+            used_canonicals.add(canonical)
+        return variables
+
+    if prefer_dictionary and DICTIONARY_VARIABLE_ORDER:
+        candidates = [v for v in DICTIONARY_VARIABLE_ORDER if v in available]
+    else:
+        candidates = [str(c) for c in df.columns if str(c) in available]
+    for candidate in candidates:
+        canonical = canonical_lookup.get(str(candidate), str(candidate))
+        if canonical in used_canonicals:
+            continue
+        variables.append(candidate)
+        used_canonicals.add(canonical)
+    return variables
+
+
+@_with_notebook_context
+def clinical_analysis_is_binary_series(x):
+    """Process clinical analysis is binary series."""
+    vals = pd.Series(x).dropna()
+    if vals.empty:
+        return False
+    if pd.api.types.is_numeric_dtype(vals):
+        u = set(pd.to_numeric(vals, errors="coerce").dropna().unique())
+        return len(u) <= 2 and u.issubset({0, 1})
+    return vals.astype(str).nunique(dropna=True) == 2
+
+
+@_with_notebook_context
+def clinical_analysis_variable_type(x):
+    """Process clinical analysis variable type."""
+    vals = pd.Series(x).dropna()
+    if vals.empty or vals.nunique(dropna=True) < 2:
+        return None
+    if clinical_analysis_is_binary_series(vals):
+        return "binary"
+    numeric = pd.to_numeric(vals, errors="coerce")
+    if numeric.notna().mean() >= 0.90 and numeric.nunique(dropna=True) > 2:
+        return "continuous"
+    return "categorical"
+
+
+@_with_notebook_context
+def clinical_analysis_cramers_v_from_table(tab):
+    """Process clinical analysis cramers v from table."""
+    arr = np.asarray(tab, dtype=float)
+    n = arr.sum()
+    if n == 0 or min(arr.shape) < 2:
+        return np.nan
+    expected = np.outer(arr.sum(axis=1), arr.sum(axis=0)) / n
+    with np.errstate(divide="ignore", invalid="ignore"):
+        stat = np.nansum((arr - expected) ** 2 / expected)
+    denom = n * (min(arr.shape) - 1)
+    return float(np.sqrt(stat / denom)) if denom > 0 else np.nan
+
+
+@_with_notebook_context
+def clinical_analysis_chi_square_test(tab):
+    """Process clinical analysis chi square test."""
+    arr = np.asarray(tab, dtype=float)
+    if arr.shape[0] < 2 or arr.shape[1] < 2 or arr.sum() == 0:
+        return np.nan, np.nan, np.nan
+    if _HAS_SCIPY_STATS:
+        stat, p, _, _ = _scipy_chi2_contingency(arr)
+    else:
+        expected = np.outer(arr.sum(axis=1), arr.sum(axis=0)) / arr.sum()
+        with np.errstate(divide="ignore", invalid="ignore"):
+            stat = np.nansum((arr - expected) ** 2 / expected)
+        p = np.nan
+    return float(stat), float(p), clinical_analysis_cramers_v_from_table(arr)
+
+
+@_with_notebook_context
+def clinical_analysis_rank_anova_or_kruskal(groups):
+    """Process clinical analysis rank anova or kruskal."""
+    clean_groups = [pd.to_numeric(pd.Series(g), errors="coerce").dropna().to_numpy() for g in groups]
+    clean_groups = [g for g in clean_groups if len(g) > 0]
+    if len(clean_groups) < 2:
+        return np.nan, np.nan, np.nan
+    if _HAS_SCIPY_STATS:
+        stat, p = _scipy_kruskal(*clean_groups)
+    else:
+        values = np.concatenate(clean_groups)
+        ranks = pd.Series(values).rank(method="average").to_numpy()
+        labels = np.concatenate([[i] * len(g) for i, g in enumerate(clean_groups)])
+        grand = ranks.mean()
+        ss_between = sum((ranks[labels == i].mean() - grand) ** 2 * (labels == i).sum() for i in np.unique(labels))
+        ss_total = ((ranks - grand) ** 2).sum()
+        stat = ss_between / max(1, len(clean_groups) - 1)
+        p = np.nan
+    n = sum(len(g) for g in clean_groups)
+    eta_like = float(stat / max(stat + n - len(clean_groups), 1e-12)) if np.isfinite(stat) else np.nan
+    return float(stat), float(p), eta_like
+
+
+@_with_notebook_context
+def clinical_analysis_summarize_group_differences(df, comparisons, variables=None, output_prefix=None):
+    """Process clinical analysis summarize group differences."""
+    rows = []
+    comparisons = [c for c in comparisons if c in df.columns]
+    variables = variables or clinical_analysis_analysis_variables(df, comparison_cols=comparisons)
+
+    for comp in comparisons:
+        d = df.loc[df[comp].notna()].copy()
+        groups = d[comp].astype(str)
+        if groups.nunique(dropna=True) < 2:
+            continue
+        for variable in variables:
+            if variable not in d.columns or variable == comp:
+                continue
+            vt = clinical_analysis_variable_type(d[variable])
+            if vt is None:
+                continue
+
+            sub = pd.DataFrame({"group": groups, "value": d[variable]}).dropna(subset=["value"])
+            if sub["group"].nunique() < 2:
+                continue
+
+            if vt == "continuous":
+                grouped = [g["value"] for _, g in sub.groupby("group", sort=True)]
+                stat, p, effect = clinical_analysis_rank_anova_or_kruskal(grouped)
+                summary = sub.assign(value=pd.to_numeric(sub["value"], errors="coerce")).groupby("group")["value"].agg(["count", "mean", "std", "median"]).reset_index()
+                test = "Kruskal-Wallis"
+                effect_name = "eta2_H"
+            else:
+                tab = pd.crosstab(sub["group"].astype(str), sub["value"].astype(str))
+                stat, p, effect = clinical_analysis_chi_square_test(tab)
+                summary = tab.reset_index()
+                test = "Chi-square"
+                effect_name = "cramers_v"
+
+            rows.append({
+                "comparison": comp,
+                "variable": variable,
+                "label": clinical_analysis_label_for_variable(variable),
+                "var_type": vt,
+                "test": test,
+                "statistic": stat,
+                "p": p,
+                "effect_size": effect,
+                "effect_size_name": effect_name,
+                "n": int(sub.shape[0]),
+                "n_groups": int(sub["group"].nunique()),
+                "summary": summary.to_json(orient="records"),
+            })
+
+    out = pd.DataFrame(rows)
+    if out.empty:
+        return out
+    out["fdr"] = out.groupby("comparison")["p"].transform(clinical_analysis_bh_fdr)
+    out = out.sort_values(["comparison", "fdr", "p", "label"], na_position="last").reset_index(drop=True)
+    if output_prefix:
+        out.to_csv(POST_ANALYSIS_DIR / f"{output_prefix}_difference_summary_long.csv", index=False)
+        compact = out.assign(
+            cell=lambda x: x.apply(
+                lambda r: f"ES={r['effect_size']:.3g}; FDR={r['fdr']:.3g}" if pd.notna(r["fdr"]) else "",
+                axis=1,
+            )
+        ).pivot_table(index="label", columns="comparison", values="cell", aggfunc="first").reset_index()
+        compact.to_csv(POST_ANALYSIS_DIR / f"{output_prefix}_difference_summary_compact.csv", index=False)
+        display(compact)
+    return out
+
+
+@_with_notebook_context
+def clinical_analysis_demographic_summary_table(df, comparison, variables=None, output_name=None):
+    """Process clinical analysis demographic summary table."""
+    variables = variables or clinical_analysis_analysis_variables(df, comparison_cols=[comparison])
+    rows = []
+    d = df.loc[df[comparison].notna()].copy()
+    for variable in variables:
+        if variable not in d.columns:
+            continue
+        vt = clinical_analysis_variable_type(d[variable])
+        if vt is None:
+            continue
+        if vt == "continuous":
+            for group, sub in d.groupby(d[comparison].astype(str)):
+                x = pd.to_numeric(sub[variable], errors="coerce")
+                rows.append({
+                    "comparison": comparison,
+                    "group": group,
+                    "variable": variable,
+                    "label": clinical_analysis_label_for_variable(variable),
+                    "level": "",
+                    "type": vt,
+                    "n": int(x.notna().sum()),
+                    "summary": f"{x.mean():.2f} ({x.std():.2f})" if x.notna().any() else "",
+                })
+        else:
+            for (group, level), n in d.groupby([d[comparison].astype(str), d[variable].astype(str)], dropna=False).size().items():
+                denom = int((d[comparison].astype(str) == group).sum())
+                rows.append({
+                    "comparison": comparison,
+                    "group": group,
+                    "variable": variable,
+                    "label": clinical_analysis_label_for_variable(variable),
+                    "level": level,
+                    "type": vt,
+                    "n": int(n),
+                    "summary": f"{int(n)} ({(n / denom * 100) if denom else np.nan:.1f}%)",
+                })
+    out = pd.DataFrame(rows)
+    if output_name:
+        out.to_csv(POST_ANALYSIS_DIR / output_name, index=False)
+    return out
+
+
+@_with_notebook_context
+def clinical_analysis_positive_binary_level(x):
+    """Process clinical analysis positive binary level."""
+    vals = pd.Series(x).dropna().astype(str).unique().tolist()
+    if len(vals) < 2:
+        return None
+    positives = {"1", "yes", "true", "positive", "present", "high", "case", "chr"}
+    for value in vals:
+        if value.lower() in positives:
+            return value
+    return sorted(vals)[1] if len(vals) > 1 else sorted(vals)[0]
+
+
+@_with_notebook_context
+def clinical_analysis_format_fdr_text(value):
+    """Process clinical analysis format fdr text."""
+    if pd.isna(value):
+        return ""
+    if value < 0.001:
+        return "<0.001"
+    return f"{value:.3f}"
+
+
+@_with_notebook_context
+def clinical_analysis_stars_from_fdr(value):
+    """Process clinical analysis stars from fdr."""
+    if pd.isna(value):
+        return ""
+    if value < 0.001:
+        return "***"
+    if value < 0.01:
+        return "**"
+    if value < 0.05:
+        return "*"
+    return ""
+
+
+@_with_notebook_context
+def clinical_analysis_cohens_d_group_vs_rest(values, groups, group):
+    """Process clinical analysis cohens d group vs rest."""
+    numeric = pd.to_numeric(pd.Series(values), errors="coerce")
+    group_mask = pd.Series(groups).astype(str).eq(str(group))
+    a = numeric[group_mask].dropna().to_numpy(dtype=float)
+    b = numeric[~group_mask].dropna().to_numpy(dtype=float)
+    if len(a) == 0 or len(b) == 0:
+        return np.nan
+    mean_diff = float(np.mean(a) - np.mean(b))
+    if len(a) + len(b) <= 2:
+        return np.nan
+    pooled_var = ((len(a) - 1) * np.var(a, ddof=1) + (len(b) - 1) * np.var(b, ddof=1)) / (len(a) + len(b) - 2)
+    if not np.isfinite(pooled_var) or pooled_var <= 0:
+        return 0.0 if np.isclose(mean_diff, 0.0) else np.nan
+    return mean_diff / float(np.sqrt(pooled_var))
+
+
+@_with_notebook_context
+def clinical_analysis_cohens_h_group_vs_rest(values, groups, group):
+    """Process clinical analysis cohens h group vs rest."""
+    series = pd.Series(values)
+    if pd.api.types.is_numeric_dtype(series):
+        binary = pd.to_numeric(series, errors="coerce")
+    else:
+        positive = clinical_analysis_positive_binary_level(series)
+        if positive is None:
+            return np.nan
+        binary = series.astype(str).eq(str(positive)).astype(float)
+        binary[series.isna()] = np.nan
+    group_mask = pd.Series(groups).astype(str).eq(str(group))
+    p_group = binary[group_mask].dropna().mean()
+    p_rest = binary[~group_mask].dropna().mean()
+    if not np.isfinite(p_group) or not np.isfinite(p_rest):
+        return np.nan
+    p_group = float(np.clip(p_group, 0.0, 1.0))
+    p_rest = float(np.clip(p_rest, 0.0, 1.0))
+    return 2.0 * (np.arcsin(np.sqrt(p_group)) - np.arcsin(np.sqrt(p_rest)))
+
+
+@_with_notebook_context
+def clinical_analysis_cramers_v_group_vs_rest(values, groups, group):
+    """Process clinical analysis cramers v group vs rest."""
+    valid = pd.DataFrame({"value": values, "group": pd.Series(groups).astype(str)}).dropna()
+    if valid.empty:
+        return np.nan
+    valid["in_group"] = np.where(valid["group"].eq(str(group)), str(group), "rest")
+    if valid["in_group"].nunique() < 2 or valid["value"].astype(str).nunique() < 2:
+        return np.nan
+    table = pd.crosstab(valid["in_group"], valid["value"].astype(str))
+    return clinical_analysis_cramers_v_from_table(table)
+
+
+@_with_notebook_context
+def clinical_analysis_group_vs_rest_effect_size(values, groups, group, var_type):
+    """Process clinical analysis group vs rest effect size."""
+    if var_type == "continuous":
+        return clinical_analysis_cohens_d_group_vs_rest(values, groups, group)
+    if var_type == "binary":
+        return clinical_analysis_cohens_h_group_vs_rest(values, groups, group)
+    if var_type == "categorical":
+        return clinical_analysis_cramers_v_group_vs_rest(values, groups, group)
+    return np.nan
+
+
+@_with_notebook_context
+def clinical_analysis_effect_size_cmap():
+    """Process clinical analysis effect size cmap."""
+    try:
+        return sns.color_palette("vlag", as_cmap=True)
+    except Exception:
+        return plt.get_cmap("coolwarm")
+
+
+@_with_notebook_context
+def clinical_analysis_readable_text_color(face_color):
+    """Process clinical analysis readable text color."""
+    from matplotlib import colors as mcolors
+    r, g, b, _ = mcolors.to_rgba(face_color)
+    luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b
+    return "white" if luminance < 0.48 else "black"
+
+
+@_with_notebook_context(default_expressions={'dictionary_path': 'DICTIONARY_DIR_DIFF'})
+def clinical_analysis_load_metadata_variable_map(meta_df=None, dictionary_path=None):
+    """Process clinical analysis load metadata variable map."""
+    meta_table = clinical_analysis_metadata_variable_table(meta_df)
+    alias_lookup = clinical_analysis_variable_canonical_lookup(meta_df)
+    label_lookup = VARIABLE_LABELS if "VARIABLE_LABELS" in globals() else {}
+    rows = []
+    if not meta_table.empty:
+        for _, row in meta_table.iterrows():
+            canonical = str(row["canonical_variable"])
+            rows.append({
+                "variable": canonical,
+                "canonical_variable": canonical,
+                "Modality": row["Modality"],
+                "dict_row": row["meta_row"],
+                "element_short": canonical,
+                "priority": 0,
+            })
+        for alias, canonical in alias_lookup.items():
+            if alias == canonical:
+                continue
+            match = meta_table.loc[meta_table["canonical_variable"].eq(canonical)]
+            if match.empty:
+                continue
+            first = match.iloc[0]
+            rows.append({
+                "variable": alias,
+                "canonical_variable": canonical,
+                "Modality": first["Modality"],
+                "dict_row": first["meta_row"],
+                "element_short": canonical,
+                "priority": 1,
+            })
+    if not rows:
+        dict_df = pd.read_excel(dictionary_path)
+        required = {"ElementName", "Modality"}
+        missing = required.difference(dict_df.columns)
+        if missing:
+            raise KeyError(f"Dictionary is missing required columns for heatmap ordering: {sorted(missing)}")
+        aliases_col = "Aliases" if "Aliases" in dict_df.columns else None
+        for i, row in dict_df.reset_index(drop=True).iterrows():
+            element = str(row["ElementName"]) if pd.notna(row["ElementName"]) else ""
+            modality = str(row["Modality"]) if pd.notna(row["Modality"]) else "Other / Unmapped"
+            if element and element not in HEATMAP_EXCLUDED_VARIABLES:
+                rows.append({"variable": element, "canonical_variable": element, "Modality": modality, "dict_row": i, "priority": 1, "element_short": element})
+            if aliases_col and pd.notna(row.get(aliases_col)):
+                for alias in re.split(r"[;|,\n\r]+", str(row.get(aliases_col))):
+                    alias = alias.strip()
+                    if alias and element not in HEATMAP_EXCLUDED_VARIABLES:
+                        rows.append({"variable": alias, "canonical_variable": element or alias, "Modality": modality, "dict_row": i, "priority": 2, "element_short": element or alias})
+    lookup = pd.DataFrame(rows)
+    if lookup.empty:
+        return pd.DataFrame(columns=["variable", "canonical_variable", "Modality", "dict_row", "element_short"])
+    lookup = lookup.sort_values(["variable", "priority", "dict_row"]).drop_duplicates("variable", keep="first")
+    return lookup[["variable", "canonical_variable", "Modality", "dict_row", "element_short"]]
+
+
+@_with_notebook_context(default_expressions={'comparisons': 'SUBGROUP_VARS'})
+def clinical_analysis_build_mixed_heatmap_data_rmd_style(df, diff_summary, comparisons=None):
+    """Python analogue of the Rmd's build_mixed_heatmap_data()."""
+    if diff_summary.empty:
+        return pd.DataFrame()
+
+    rows = []
+    use = diff_summary.loc[diff_summary["comparison"].isin(comparisons)].copy()
+    # Keep all variables returned by the demographic/difference table, as in the Rmd.
+    use = use.sort_values(["comparison", "fdr", "p", "variable"], na_position="last")
+
+    for comp in comparisons:
+        comp_rows = use.loc[use["comparison"] == comp]
+        if comp not in df.columns or comp_rows.empty:
+            print(f"Skipping comparison {comp!r}: not found in data or no difference rows.")
+            continue
+
+        df2 = df.loc[df[comp].notna()].copy()
+        df2[comp] = df2[comp].astype(str)
+        grp_levels = list(pd.unique(df2[comp]))
+
+        for _, r in comp_rows.iterrows():
+            variable = r["variable"]
+            if variable not in df2.columns or variable in HEATMAP_EXCLUDED_VARIABLES:
+                continue
+            canonical_variable = clinical_analysis_variable_canonical_lookup().get(str(variable), str(variable))
+            vt = r["var_type"]
+            x = df2[variable]
+            for k, group in enumerate(grp_levels, start=1):
+                sub = df2.loc[df2[comp] == group]
+                if vt == "continuous":
+                    value = pd.to_numeric(sub[variable], errors="coerce").mean()
+                elif vt == "binary":
+                    if pd.api.types.is_numeric_dtype(x):
+                        value = pd.to_numeric(sub[variable], errors="coerce").mean()
+                    else:
+                        pos = clinical_analysis_positive_binary_level(x)
+                        value = (sub[variable].astype(str) == pos).mean() if pos is not None else np.nan
+                else:
+                    value = np.nan
+                effect_size = clinical_analysis_group_vs_rest_effect_size(df2[variable], df2[comp], group, vt)
+                rows.append({
+                    "comparison": comp,
+                    "x": f"{comp} | {group}",
+                    "k": k,
+                    "variable": variable,
+                    "canonical_variable": canonical_variable,
+                    "label": r["label"],
+                    "var_type": vt,
+                    "value": value,
+                    "effect_size_plot": effect_size,
+                    "effect_size_name": {
+                        "continuous": "cohens_d_group_vs_rest",
+                        "binary": "cohens_h_group_vs_rest",
+                        "categorical": "cramers_v_group_vs_rest",
+                    }.get(vt),
+                    "fdr_num": r["fdr"],
+                    "fdr_text": clinical_analysis_format_fdr_text(r["fdr"]),
+                })
+
+    heat = pd.DataFrame(rows)
+    if heat.empty:
+        return heat
+
+    heat = heat.sort_values(["comparison", "fdr_num", "variable"], na_position="last").drop_duplicates(
+        subset=["comparison", "x", "canonical_variable", "var_type"],
+        keep="first",
+    )
+    heat["effect_size_plot"] = pd.to_numeric(heat["effect_size_plot"], errors="coerce")
+    heat["value_plot_cont"] = np.nan
+    heat["value_plot_bin"] = np.nan
+    heat.loc[heat["var_type"].eq("continuous"), "value_plot_cont"] = heat.loc[
+        heat["var_type"].eq("continuous"), "effect_size_plot"
+    ]
+    heat.loc[heat["var_type"].eq("binary"), "value_plot_bin"] = heat.loc[
+        heat["var_type"].eq("binary"), "effect_size_plot"
+    ]
+    return heat
+
+
+@_with_notebook_context(default_expressions={'modality_order': 'SUBGROUP_VARS'})
+def clinical_analysis_add_modality_spacers_rmd_style(heat_df, spacer_suffix=" ", modality_order=None):
+    """Process clinical analysis add modality spacers rmd style."""
+    if heat_df.empty:
+        return heat_df
+    df = heat_df.copy()
+    df["modality_x"] = df["x"].astype(str).str.replace(r"\|.*$", "", regex=True).str.strip()
+    observed_modalities = list(pd.unique(df["modality_x"]))
+    modalities = [m for m in modality_order if m in observed_modalities]
+    modalities.extend([m for m in observed_modalities if m not in modalities])
+    spacer_rows = []
+    for modality in modalities[:-1]:
+        labels = df.loc[df["modality_x"] == modality, "label"].drop_duplicates()
+        for label in labels:
+            spacer_rows.append({
+                "comparison": np.nan,
+                "x": f"{modality}{spacer_suffix}",
+                "k": np.nan,
+                "variable": np.nan,
+                "canonical_variable": np.nan,
+                "label": label,
+                "var_type": "spacer",
+                "value": np.nan,
+                "fdr_num": np.nan,
+                "fdr_text": "",
+                "value_plot_cont": np.nan,
+                "value_plot_bin": np.nan,
+                "effect_size_plot": np.nan,
+                "effect_size_name": np.nan,
+                "modality_x": modality,
+            })
+    if spacer_rows:
+        df = pd.concat([df, pd.DataFrame(spacer_rows)], ignore_index=True)
+
+    x_levels = []
+    for modality in modalities:
+        xs = df.loc[(df["modality_x"] == modality) & df["x"].astype(str).str.contains(r"\|", regex=True), "x"].drop_duplicates().tolist()
+        x_levels.extend(xs)
+        if modality != modalities[-1]:
+            x_levels.append(f"{modality}{spacer_suffix}")
+    x_pos = {}
+    cur = 0.0
+    for x in x_levels:
+        if "|" in str(x):
+            cur += 1.0
+        else:
+            cur += 0.20
+        x_pos[x] = cur
+    df["x"] = pd.Categorical(df["x"], categories=x_levels, ordered=True)
+    df["x_pos"] = df["x"].astype(str).map(x_pos)
+    return df.drop(columns=["modality_x"], errors="ignore")
+
+
+@_with_notebook_context(default_expressions={'dictionary_path': 'DICTIONARY_DIR_DIFF'})
+def clinical_analysis_heatmap_variable_map(heat_df, dictionary_path=None):
+    """Process clinical analysis heatmap variable map."""
+    lookup = clinical_analysis_load_metadata_variable_map(dictionary_path=dictionary_path)
+    vars_present = (
+        heat_df[["variable", "canonical_variable"]]
+        .dropna(subset=["variable"])
+        .astype(str)
+        .drop_duplicates(subset=["variable"], keep="first")
+    )
+    mapped = vars_present.merge(lookup, on="variable", how="left", suffixes=("", "_mapped"))
+    if "canonical_variable_mapped" in mapped:
+        mapped["canonical_variable"] = mapped["canonical_variable_mapped"].fillna(mapped["canonical_variable"])
+        mapped = mapped.drop(columns=["canonical_variable_mapped"], errors="ignore")
+    mapped["Modality"] = mapped["Modality"].fillna("Other / Unmapped")
+    mapped["dict_row"] = mapped["dict_row"].fillna(np.inf)
+    mapped["element_short"] = mapped["element_short"].fillna(mapped["canonical_variable"]).fillna(mapped["variable"])
+    mapped["element_short"] = mapped["element_short"].map(display_feature_name)
+    mapped = mapped.sort_values(["dict_row", "canonical_variable", "variable"]).drop_duplicates("canonical_variable", keep="first")
+    return mapped
+
+
+@_with_notebook_context
+def clinical_analysis_heatmap_modality_display_label(modality):
+    """Process clinical analysis heatmap modality display label."""
+    return str(modality).replace("_", " ")
+
+
+@_with_notebook_context
+def clinical_analysis_combined_panel_data(heat_df, modality_order=None):
+    """Process clinical analysis combined panel data."""
+    modality_order = modality_order or ["Psychoticism", "Detachment", "Internalising", "Functioning", "Cognition", "Demographics", "study_info"]
+    df = heat_df.loc[~heat_df["var_type"].eq("spacer")].copy()
+    if df.empty:
+        return df, [], [], set()
+
+    var_map = clinical_analysis_heatmap_variable_map(df)
+    df = df.merge(var_map, on="variable", how="left")
+    mods_in_panel = var_map["Modality"].dropna().drop_duplicates().tolist()
+    mods_present = [m for m in modality_order if m in mods_in_panel] + [m for m in mods_in_panel if m not in modality_order and m != "Other / Unmapped"]
+    if "Other / Unmapped" in mods_in_panel:
+        mods_present.append("Other / Unmapped")
+
+    y_rows = []
+    for modality in mods_present:
+        vars_m = (
+            var_map.loc[var_map["Modality"] == modality]
+            .sort_values(["dict_row", "element_short", "variable"])
+        )
+        if vars_m.empty:
+            continue
+        y_rows.append({
+            "y_id": f"##{modality}",
+            "y_label": clinical_analysis_heatmap_modality_display_label(modality),
+            "is_header": True,
+            "variable": None,
+        })
+        for _, row in vars_m.iterrows():
+            y_rows.append({
+                "y_id": f"{modality}__{row['variable']}",
+                "y_label": f"  {row['element_short']}",
+                "is_header": False,
+                "variable": row["variable"],
+            })
+    y_map = pd.DataFrame(y_rows)
+    y_levels = y_map["y_id"].tolist()
+    y_pos = {y: len(y_levels) - 1 - i for i, y in enumerate(y_levels)}
+    label_map = dict(zip(y_map["y_id"], y_map["y_label"]))
+    header_set = set(y_map.loc[y_map["is_header"], "y_id"])
+
+    df["y_id"] = df["Modality"].astype(str) + "__" + df["variable"].astype(str)
+    df["y_pos"] = df["y_id"].map(y_pos)
+    return df, y_levels, [label_map[y] for y in y_levels], header_set
+
+
+@_with_notebook_context
+def clinical_analysis_heatmap_x_display_label(x):
+    """Process clinical analysis heatmap x display label."""
+    text = str(x)
+    if "|" not in text:
+        return text
+    comparison, group = [part.strip() for part in text.split("|", 1)]
+    return f"{clinical_analysis_subgroup_display_label(comparison)} | {group}"
+
+
+@_with_notebook_context
+def clinical_analysis_plot_mixed_heatmap_split_rmd_style(
+    heat_df,
+    title="My heatmap ordered by modality",
+    filename="heatmap_group_effect_sizes_ordered.svg",
+    width=14,
+    height=18,
+    x_text_size=11,
+    y_text_size=11,
+    p_text_size=8,
+    categorical_grey="#d9d9d9",
+    effect_clip_quantile=0.95,
+):
+    """Process clinical analysis plot mixed heatmap split rmd style."""
+    if heat_df.empty:
+        print("No heatmap data produced.")
+        return None
+
+    x_levels = [x for x in heat_df["x"].cat.categories if "|" in str(x)]
+    x_pos_df = heat_df[["x", "x_pos"]].drop_duplicates("x").copy()
+    x_pos_df["x_key"] = x_pos_df["x"].astype(str)
+    x_pos = x_pos_df.set_index("x_key")["x_pos"].to_dict()
+    x_tick_pos = [x_pos[str(x)] for x in x_levels if str(x) in x_pos]
+    if not x_tick_pos:
+        raise ValueError("No real heatmap x-axis columns were found after adding spacer columns.")
+
+    finite_effects = pd.to_numeric(heat_df["effect_size_plot"], errors="coerce")
+    finite_effects = finite_effects[np.isfinite(finite_effects)]
+    if len(finite_effects):
+        abs_effects = np.abs(finite_effects.to_numpy(dtype=float))
+        if effect_clip_quantile is None:
+            effect_vmax = float(np.nanmax(abs_effects))
+        else:
+            effect_vmax = float(np.nanquantile(abs_effects, effect_clip_quantile))
+    else:
+        effect_vmax = 1.0
+    effect_vmax = max(effect_vmax, 1e-6)
+    effect_norm = plt.Normalize(-effect_vmax, effect_vmax, clip=True)
+    effect_cmap = clinical_analysis_effect_size_cmap()
+
+    dfp, y_levels, y_labels, header_set = clinical_analysis_combined_panel_data(heat_df)
+    fig, ax = plt.subplots(1, 1, figsize=(width, height))
+    ax.set_xlim(min(x_tick_pos) - 0.6, max(x_tick_pos) + 0.6)
+    ax.set_ylim(-0.5, max(0, len(y_levels) - 0.5))
+    ax.set_yticks(range(len(y_levels)))
+    ax.set_yticklabels(list(reversed(y_labels)), fontsize=y_text_size)
+    for tick, y_id in zip(ax.get_yticklabels(), reversed(y_levels)):
+        if y_id in header_set:
+            tick.set_fontweight("bold")
+            tick.set_fontsize(13)
+    ax.tick_params(axis="y", length=0)
+    ax.spines[["top", "right"]].set_visible(False)
+
+    if dfp.empty:
+        ax.text(0.5, 0.5, "No variables", ha="center", va="center", transform=ax.transAxes)
+    else:
+        real = dfp.loc[dfp["y_pos"].notna()].copy()
+        for idx, row in real.iterrows():
+            val = pd.to_numeric(row["effect_size_plot"], errors="coerce")
+            face = "white" if pd.isna(val) else effect_cmap(effect_norm(float(val)))
+            ax.add_patch(plt.Rectangle((row["x_pos"] - 0.5, row["y_pos"] - 0.45), 1.0, 0.9, facecolor=face, edgecolor="white", linewidth=0.3))
+        sm = plt.cm.ScalarMappable(norm=effect_norm, cmap=effect_cmap)
+        cbar = fig.colorbar(sm, ax=ax, fraction=0.025, pad=0.01, extend="both")
+        cbar_label = "Effect size" if effect_clip_quantile is None else f"Effect size (clipped at |ES|={effect_vmax:.2g})"
+        cbar.set_label(cbar_label, fontsize=12)
+
+        # Rmd-style annotation: stars on first group, FDR text on second group.
+        for _, row in real.iterrows():
+            label = ""
+            if row.get("k") == 1:
+                label = clinical_analysis_stars_from_fdr(row.get("fdr_num"))
+            elif row.get("k") == 2 and str(row.get("fdr_text", "")):
+                label = str(row.get("fdr_text"))
+            if label:
+                val = pd.to_numeric(row["effect_size_plot"], errors="coerce")
+                face = "white" if pd.isna(val) else effect_cmap(effect_norm(float(val)))
+                ax.text(row["x_pos"], row["y_pos"], label, ha="center", va="center", color=clinical_analysis_readable_text_color(face), fontsize=p_text_size)
+
+    ax.set_xticks(x_tick_pos)
+    ax.set_xticklabels([clinical_analysis_heatmap_x_display_label(x) for x in x_levels], rotation=45, ha="right", fontsize=x_text_size)
+    ax.set_xlabel("Modality | group", fontsize=14)
+    fig.suptitle(title, fontsize=20, y=0.995)
+    fig.tight_layout(rect=[0, 0, 1, 0.985])
+
+    out = POST_ANALYSIS_DIR / filename
+    clinical_analysis_save_figure_png_pdf(fig, out, dpi=300, bbox_inches="tight")
+    plt.show()
+    print("Saved:", out)
+    return fig
+
+
+@_with_notebook_context
+def clinical_analysis_run_effect_size_domain_heatmap(data, difference_summary, sample_label, filename_prefix):
+    """Process clinical analysis run effect size domain heatmap."""
+    heat_df = clinical_analysis_build_mixed_heatmap_data_rmd_style(
+        data,
+        difference_summary,
+        comparisons=SUBGROUP_VARS,
+    )
+    heat_df_spaced = clinical_analysis_add_modality_spacers_rmd_style(heat_df)
+    heat_df_spaced.to_csv(POST_ANALYSIS_DIR / f"{filename_prefix}_effect_sizes_ordered_data.csv", index=False)
+
+    fig = clinical_analysis_plot_mixed_heatmap_split_rmd_style(
+        heat_df_spaced,
+        title=f"{sample_label} heatmap ordered by modality",
+        filename=f"{filename_prefix}_effect_sizes_ordered.svg",
+        width=14,
+        height=18,
+        p_text_size=8,
+        x_text_size=11,
+        y_text_size=11,
+    )
+    return {"figure": fig, "data": heat_df_spaced}
+
+
+@_with_notebook_context
+def clinical_analysis_site_recruitment_overview_rmd_style(merged_data):
+    """Match the Rmd site/recruitment section: merged_data -> sites factor + chrrecruit factor."""
+    d = merged_data.copy()
+    if "Site" not in d.columns or "chrrecruit" not in d.columns:
+        print("Site/recruitment columns are not available in merged_data.")
+        return None
+    d = d.loc[d["Site"].notna() & d["chrrecruit"].notna()].copy()
+    d["sites"] = d["Site"].astype(str)
+    d["chrrecruit"] = d["chrrecruit"].astype(str)
+
+    tab = pd.crosstab(d["sites"], d["chrrecruit"])
+    stat, p, v = clinical_analysis_chi_square_test(tab)
+    expected = pd.DataFrame(
+        np.outer(tab.sum(axis=1), tab.sum(axis=0)) / tab.to_numpy().sum(),
+        index=tab.index,
+        columns=tab.columns,
+    )
+    print("Site by recruitment contingency table")
+    display(tab)
+    print({"chi_square": stat, "p": p, "cramers_v": v})
+    tab.to_csv(POST_ANALYSIS_DIR / "site_by_recruitment_contingency.csv")
+    expected.to_csv(POST_ANALYSIS_DIR / "site_by_recruitment_expected_counts.csv")
+
+    plot_df = tab.stack().rename("n").reset_index()
+    plot_df["prop"] = plot_df.groupby("sites")["n"].transform(lambda s: s / s.sum())
+    plot_df.to_csv(POST_ANALYSIS_DIR / "site_recruitment_plot_data.csv", index=False)
+
+    # Rmd `site_recruitment_dist.pdf`: stacked bars, proportions within site.
+    prop = tab.div(tab.sum(axis=1), axis=0).fillna(0)
+    fig, ax = plt.subplots(figsize=(20, 20))
+    bottom = np.zeros(len(prop))
+    for col in prop.columns:
+        ax.bar(prop.index.astype(str), prop[col].values, bottom=bottom, label=str(col))
+        bottom += prop[col].values
+    ax.set_ylim(0, 1)
+    ax.set_xlabel("Site")
+    ax.set_ylabel("Proportion within site")
+    ax.set_title("Recruitment method distribution by site")
+    ax.tick_params(axis="x", rotation=45)
+    ax.legend(title="Recruitment method", bbox_to_anchor=(1.02, 1), loc="upper left")
+    fig.tight_layout()
+    out = POST_ANALYSIS_DIR / "site_recruitment_dist.pdf"
+    clinical_analysis_save_figure_png_pdf(fig, out, dpi=300, bbox_inches="tight")
+    plt.show()
+    print("Saved:", out)
+
+    # Rmd `site_recruitment.pdf`: tile heatmap of within-site proportions.
+    fig, ax = plt.subplots(figsize=(20, 20))
+    im = ax.imshow(prop.values, aspect="auto", cmap="viridis", vmin=0, vmax=max(1e-9, np.nanmax(prop.values)))
+    ax.set_xticks(range(prop.shape[1]))
+    ax.set_xticklabels(prop.columns, rotation=45, ha="right")
+    ax.set_yticks(range(prop.shape[0]))
+    ax.set_yticklabels(prop.index)
+    ax.set_xlabel("Recruitment method")
+    ax.set_ylabel("Site")
+    ax.set_title("Within-site recruitment proportions")
+    fig.colorbar(im, ax=ax, label="Within-site %")
+    fig.tight_layout()
+    out = POST_ANALYSIS_DIR / "site_recruitment.pdf"
+    clinical_analysis_save_figure_png_pdf(fig, out, dpi=300, bbox_inches="tight")
+    plt.show()
+    print("Saved:", out)
+
+    # Rmd `site_recruitment2.pdf`: ordered tile heatmap. Use hierarchical ordering if scipy is available.
+    row_order = list(prop.index)
+    col_order = list(prop.columns)
+    try:
+        from scipy.cluster.hierarchy import linkage, leaves_list
+        from scipy.spatial.distance import pdist
+        if prop.shape[0] > 1:
+            row_order = prop.index[leaves_list(linkage(pdist(prop.values), method="average"))].tolist()
+        if prop.shape[1] > 1:
+            col_order = prop.columns[leaves_list(linkage(pdist(prop.values.T), method="average"))].tolist()
+    except Exception as exc:
+        print("Could not compute clustered site/recruitment ordering; using original order:", exc)
+    prop_ord = prop.loc[row_order, col_order]
+    fig, ax = plt.subplots(figsize=(20, 20))
+    im = ax.imshow(prop_ord.values, aspect="auto", cmap="viridis", vmin=0, vmax=max(1e-9, np.nanmax(prop_ord.values)))
+    ax.set_xticks(range(prop_ord.shape[1]))
+    ax.set_xticklabels(prop_ord.columns, rotation=45, ha="right")
+    ax.set_yticks(range(prop_ord.shape[0]))
+    ax.set_yticklabels(prop_ord.index)
+    ax.set_xlabel("Recruitment method")
+    ax.set_ylabel("Site")
+    fig.colorbar(im, ax=ax, label="Within-site %")
+    fig.tight_layout()
+    out = POST_ANALYSIS_DIR / "site_recruitment2.pdf"
+    clinical_analysis_save_figure_png_pdf(fig, out, dpi=300, bbox_inches="tight")
+    plt.show()
+    print("Saved:", out)
+    return tab
+
+
+@_with_notebook_context(default_expressions={'subgroup_vars': 'SUBGROUP_VARS'})
+def clinical_analysis_subgroup_factor_long(df, factor_col, subgroup_vars=None):
+    """Process clinical analysis subgroup factor long."""
+    keep_subgroups = [c for c in subgroup_vars if c in df.columns]
+    if factor_col not in df.columns or not keep_subgroups:
+        return pd.DataFrame()
+    long = df[[factor_col] + keep_subgroups].copy()
+    long[factor_col] = long[factor_col].astype(str)
+    out = long.melt(id_vars=[factor_col], value_vars=keep_subgroups, var_name="subgroup_type", value_name="subgroup_label")
+    out = out.dropna(subset=[factor_col, "subgroup_label"])
+    out = out.loc[~out[factor_col].isin(["nan", "None", ""])]
+    out = out.loc[~out["subgroup_label"].astype(str).isin(["nan", "None", ""])]
+    return out
+
+
+@_with_notebook_context
+def clinical_analysis_test_subgroup_by_factor(df, factor_col, prefix, factor_label=None):
+    """Process clinical analysis test subgroup by factor."""
+    factor_label = factor_label or factor_col
+    long = clinical_analysis_subgroup_factor_long(df, factor_col)
+    if long.empty:
+        print(f"No data for {factor_col}")
+        return pd.DataFrame(), long
+
+    rows = []
+    for subgroup_type, sub in long.groupby("subgroup_type", sort=False):
+        tab = pd.crosstab(sub[factor_col].astype(str), sub["subgroup_label"].astype(str))
+        stat, p, v = clinical_analysis_chi_square_test(tab)
+        rows.append({
+            "subgroup_type": subgroup_type,
+            "statistic": stat,
+            "p_value": p,
+            "cramers_v": v,
+            "n": int(tab.to_numpy().sum()),
+            "n_factor_levels": tab.shape[0],
+            "n_labels": tab.shape[1],
+        })
+    results = pd.DataFrame(rows)
+    results["p_adj"] = clinical_analysis_bh_fdr(results["p_value"])
+    results = results.sort_values("p_adj", na_position="last")
+    results.to_csv(POST_ANALYSIS_DIR / f"{prefix}_subgroup_tests.csv", index=False)
+    display(results)
+
+    plot_df = (
+        long.groupby(["subgroup_type", factor_col, "subgroup_label"])
+        .size()
+        .rename("n")
+        .reset_index()
+    )
+    plot_df["prop"] = plot_df.groupby(["subgroup_type", factor_col])["n"].transform(lambda s: s / s.sum())
+    plot_df.to_csv(POST_ANALYSIS_DIR / f"{prefix}_subgroup_plot_data.csv", index=False)
+
+    subgroup_order = [s for s in SUBGROUP_VARS if s in plot_df["subgroup_type"].unique()]
+    ncols = 2
+    nrows = int(np.ceil(len(subgroup_order) / ncols))
+    fig, axes = plt.subplots(nrows, ncols, figsize=(16, max(5, 4 * nrows)), squeeze=False)
+    for ax, subgroup_type in zip(axes.ravel(), subgroup_order):
+        sub = plot_df.loc[plot_df["subgroup_type"] == subgroup_type]
+        pivot = sub.pivot_table(index=factor_col, columns="subgroup_label", values="prop", fill_value=0)
+        bottom = np.zeros(len(pivot))
+        for col in pivot.columns:
+            ax.bar(pivot.index.astype(str), pivot[col].values, bottom=bottom, label=str(col))
+            bottom += pivot[col].values
+        test_row = results.loc[results["subgroup_type"] == subgroup_type]
+        if not test_row.empty:
+            title = f"{subgroup_type}\nBH p={test_row['p_adj'].iloc[0]:.3g}; V={test_row['cramers_v'].iloc[0]:.2f}"
+        else:
+            title = subgroup_type
+        ax.set_title(title)
+        ax.set_ylabel(f"Proportion within {factor_label}")
+        ax.tick_params(axis="x", rotation=45)
+        ax.legend(title="Subgroup label", fontsize=8)
+    for ax in axes.ravel()[len(subgroup_order):]:
+        ax.axis("off")
+    fig.suptitle(f"Subgroup label distribution by {factor_label}", y=1.01)
+    fig.tight_layout()
+    out = POST_ANALYSIS_DIR / f"{prefix}_subgroup_distribution.pdf"
+    clinical_analysis_save_figure_png_pdf(fig, out, dpi=300, bbox_inches="tight")
+    plt.show()
+    print("Saved:", out)
+    return results, long
+
+
+@_with_notebook_context
+def clinical_analysis_stratified_site_tests_within_recruitment(df):
+    """Process clinical analysis stratified site tests within recruitment."""
+    required = {"Site", "chrrecruit"}
+    if not required.issubset(df.columns):
+        print("Site and chrrecruit columns are required for stratified tests.")
+        return pd.DataFrame()
+    long = df[["Site", "chrrecruit"] + [c for c in SUBGROUP_VARS if c in df.columns]].copy()
+    long = long.melt(id_vars=["Site", "chrrecruit"], value_vars=[c for c in SUBGROUP_VARS if c in df.columns], var_name="subgroup_type", value_name="subgroup_label")
+    long = long.dropna(subset=["Site", "chrrecruit", "subgroup_label"])
+    rows = []
+    for (subgroup_type, recruit), sub in long.groupby(["subgroup_type", "chrrecruit"], sort=False):
+        tab = pd.crosstab(sub["Site"].astype(str), sub["subgroup_label"].astype(str))
+        stat, p, v = clinical_analysis_chi_square_test(tab)
+        rows.append({
+            "subgroup_type": subgroup_type,
+            "chrrecruit": recruit,
+            "statistic": stat,
+            "p_value": p,
+            "cramers_v": v,
+            "n": int(tab.to_numpy().sum()),
+            "n_sites": tab.shape[0],
+            "n_labels": tab.shape[1],
+        })
+    out = pd.DataFrame(rows)
+    if not out.empty:
+        out["p_adj_within_subgroup"] = out.groupby("subgroup_type")["p_value"].transform(clinical_analysis_bh_fdr)
+        out.to_csv(POST_ANALYSIS_DIR / "site_by_subgroup_stratified_by_recruitment_tests.csv", index=False)
+        display(out.sort_values(["subgroup_type", "p_adj_within_subgroup"], na_position="last"))
+    return out
+
+
+@_with_notebook_context
+def clinical_analysis_optional_multinomial_site_recruitment_models(df):
+    """Process clinical analysis optional multinomial site recruitment models."""
+    required = {"Site", "chrrecruit"}
+    if not required.issubset(df.columns):
+        print("Skipping adjusted multinomial site/recruitment models because Site/chrrecruit columns are unavailable.")
+        return pd.DataFrame()
+    try:
+        import statsmodels.api as sm
+    except Exception as exc:
+        print("Skipping adjusted multinomial site/recruitment models because statsmodels is unavailable:", exc)
+        return pd.DataFrame()
+
+    rows = []
+    for subgroup_type in [c for c in SUBGROUP_VARS if c in df.columns]:
+        d = df[["Site", "chrrecruit", subgroup_type]].dropna().copy()
+        if d[subgroup_type].astype(str).nunique() < 2:
+            continue
+        y = pd.Categorical(d[subgroup_type].astype(str)).codes
+        X_full = pd.get_dummies(d[["Site", "chrrecruit"]].astype(str), drop_first=True, dtype=float)
+        X_full = sm.add_constant(X_full, has_constant="add")
+        try:
+            model = sm.MNLogit(y, X_full).fit(method="newton", disp=False, maxiter=200)
+            rows.append({
+                "subgroup_scheme": subgroup_type,
+                "llf": model.llf,
+                "aic": model.aic,
+                "bic": model.bic,
+                "n": int(d.shape[0]),
+                "status": "fit",
+            })
+        except Exception as exc:
+            rows.append({
+                "subgroup_scheme": subgroup_type,
+                "llf": np.nan,
+                "aic": np.nan,
+                "bic": np.nan,
+                "n": int(d.shape[0]),
+                "status": f"failed: {exc}",
+            })
+    out = pd.DataFrame(rows)
+    if not out.empty:
+        out.to_csv(POST_ANALYSIS_DIR / "site_recruitment_adjusted_multinomial_models.csv", index=False)
+        display(out)
+    return out
+
+
+@_with_notebook_context
+def clinical_analysis_domain_map_path_label_frame(
+    labels_by_modality,
+    subject_ids,
+    final_labels=None,
+    sample_name="sample",
+    stage_order_for_labels=None,
+    final_name="Integrated",
+    min_group_n=4,
+    include_final_in_path=False,
+):
+    """Process clinical analysis domain map path label frame."""
+    stage_order_for_labels = list(stage_order_for_labels or labels_by_modality.keys())
+    subject_ids = pd.Series(subject_ids, name=_subject_id_column).astype(str).reset_index(drop=True)
+    n_subjects = len(subject_ids)
+    label_frame = pd.DataFrame({_subject_id_column: subject_ids})
+    path_stages = []
+    for stage in stage_order_for_labels:
+        if stage not in labels_by_modality:
+            continue
+        values = pd.Series(labels_by_modality[stage]).astype(str).reset_index(drop=True)
+        if len(values) != n_subjects:
+            raise ValueError(
+                f"{sample_name}: label length mismatch for {stage}: "
+                f"{len(values)} labels for {n_subjects} subject IDs."
+            )
+        label_frame[stage] = values.str.replace(" ", "_", regex=False)
+        path_stages.append(stage)
+    if final_labels is not None:
+        final_values = pd.Series(final_labels).astype(str).reset_index(drop=True)
+        if len(final_values) != n_subjects:
+            raise ValueError(
+                f"{sample_name}: final label length mismatch: "
+                f"{len(final_values)} labels for {n_subjects} subject IDs."
+            )
+        label_frame[final_name] = final_values.str.replace(" ", "_", regex=False)
+        if include_final_in_path:
+            path_stages.append(final_name)
+    if not path_stages:
+        raise ValueError(f"{sample_name}: no domain-map labels were available.")
+
+    # The group is the observed path through the domain-map axes. By default this
+    # excludes the final/integrated label so the groups are true domain profiles
+    # rather than the two integrated clusters.
+    label_frame["label"] = label_frame[path_stages].agg(" -> ".join, axis=1)
+    label_frame["domain_map_path"] = label_frame["label"]
+
+    component_cols = [_subject_id_column, "domain_map_path"] + path_stages
+    label_frame[component_cols].to_csv(
+        os.path.join(_DOMAIN_MAP_GROUPS_DIR, f"{sample_name}_domain_map_path_labels.csv"),
+        index=False,
+    )
+
+    counts = label_frame["label"].value_counts().rename_axis("domain_map_path").reset_index(name="n")
+    counts["meets_min_group_n"] = counts["n"].ge(min_group_n)
+    counts.to_csv(os.path.join(_DOMAIN_MAP_GROUPS_DIR, f"{sample_name}_domain_map_path_counts.csv"), index=False)
+    print(
+        f"{sample_name}: {counts.shape[0]} domain-map paths; "
+        f"{int(counts['meets_min_group_n'].sum())} have n >= {min_group_n}."
+    )
+    display(counts.head(30))
+    return label_frame, counts
+
+
+@_with_notebook_context
+def clinical_analysis_longitudinal_results_with_long_df(results):
+    """Process clinical analysis longitudinal results with long df."""
+    analyses = (results or {}).get("analyses", {})
+    if not analyses:
+        return False
+    for analysis in analyses.values():
+        long_df = analysis.get("mixedlm", {}).get("long_df", pd.DataFrame())
+        if isinstance(long_df, pd.DataFrame) and not long_df.empty:
+            return True
+    return False
+
+
+@_with_notebook_context
+def clinical_analysis_get_domain_map_source_longitudinal_results():
+    """Process clinical analysis get domain map source longitudinal results."""
+    if "longitudinal_results" in globals() and clinical_analysis_longitudinal_results_with_long_df(longitudinal_results):
+        print("Using in-memory longitudinal long-format data from longitudinal_results.")
+        return longitudinal_results
+
+    print("Rebuilding longitudinal long-format data in the domain-map output folder because cached results do not store long_df.")
+    _is_singleclust_result = isinstance(final_metrics.get("data"), pd.DataFrame) if isinstance(final_metrics, dict) else False
+    _data_dirs = globals().get("_longitudinal_data_dirs") or [
+        'path/to/simpleclust_data'
+        if _is_singleclust_result
+        else 'path/to/multiclust_data'
+    ]
+    _prescient_ids = globals().get("_longitudinal_prescient_ids")
+    if _prescient_ids is None and "prescient_ids" in globals():
+        _prescient_ids = prescient_ids
+    elif _prescient_ids is None and "prescient" in globals():
+        _prescient_ids = set(prescient[_subject_id_column])
+
+    return Utils.run_longitudinal_multiclust_report(
+        final_metrics=final_metrics,
+        meta=meta,
+        plots_dir=_DOMAIN_MAP_GROUPS_DIR,
+        data_dirs=_data_dirs,
+        prescient_ids=_prescient_ids,
+        vars_to_keep=vars_to_keep if "vars_to_keep" in globals() else None,
+        categorical_columns=cat_vars if "cat_vars" in globals() else None,
+        validation_domain_labels=globals().get("_validation_domain_labels"),
+        validation_final_labels=globals().get("_validation_final_labels"),
+        validation_subject_ids=globals().get("_validation_subject_ids"),
+        validation_baseline_data=globals().get("_validation_baseline_data"),
+        months=(1, 2, 3, 4, 5),
+        subject_id_column=_subject_id_column,
+        min_features_per_analysis=2,
+        min_features_for_cluster_change=1,
+        min_followup_timepoints_per_feature=1,
+        min_nonmissing_per_timepoint=8,
+        followup_col_threshold=0.5,
+        followup_row_threshold=0.5,
+        min_group_n=4,
+        reuse_existing=False,
+        skip_model_fits=True,
+    )
+
+
+@_with_notebook_context
+def clinical_analysis_run_domain_map_mixed_models_from_long_df(
+    long_df,
+    labels_df,
+    output_dir,
+    analysis_name,
+    min_group_n=4,
+    top_n_plot=12,
+    max_plot_groups=None,
+):
+    """Process clinical analysis run domain map mixed models from long df."""
+    try:
+        import statsmodels.formula.api as smf
+        from statsmodels.stats.multitest import multipletests
+    except Exception as exc:
+        raise ImportError("statsmodels is required for domain-map longitudinal mixed models.") from exc
+
+    os.makedirs(output_dir, exist_ok=True)
+    labels_use = labels_df[[_subject_id_column, "label"]].dropna().drop_duplicates(_subject_id_column).copy()
+    labels_use[_subject_id_column] = labels_use[_subject_id_column].astype(str)
+
+    df = long_df.drop(columns=["label"], errors="ignore").copy()
+    df[_subject_id_column] = df[_subject_id_column].astype(str)
+    df = df.merge(labels_use, on=_subject_id_column, how="inner").dropna(subset=["value", "label"])
+    if df.empty:
+        summary = pd.DataFrame([{"analysis_name": analysis_name, "status": "no_overlap_with_domain_map_labels"}])
+        summary.to_csv(os.path.join(output_dir, f"{analysis_name}_domain_map_mixedlm_summary.csv"), index=False)
+        return {"summary": summary, "mean_drift": {}}
+
+    baseline_group_counts = (
+        df.loc[df["time"].astype(str).eq("baseline"), [_subject_id_column, "label"]]
+        .drop_duplicates(_subject_id_column)["label"]
+        .value_counts()
+    )
+    eligible_groups = baseline_group_counts.loc[baseline_group_counts.ge(min_group_n)].index.astype(str).tolist()
+    group_report = baseline_group_counts.rename_axis("domain_map_path").reset_index(name="baseline_n")
+    group_report["included_in_models"] = group_report["domain_map_path"].astype(str).isin(eligible_groups)
+    group_report.to_csv(os.path.join(output_dir, f"{analysis_name}_domain_map_model_group_counts.csv"), index=False)
+    df = df.loc[df["label"].astype(str).isin(eligible_groups)].copy()
+    if len(eligible_groups) < 2 or df.empty:
+        summary = pd.DataFrame([{
+            "analysis_name": analysis_name,
+            "status": "too_few_domain_map_paths_after_min_group_filter",
+            "n_eligible_groups": int(len(eligible_groups)),
+            "min_group_n": int(min_group_n),
+        }])
+        summary.to_csv(os.path.join(output_dir, f"{analysis_name}_domain_map_mixedlm_summary.csv"), index=False)
+        return {"summary": summary, "mean_drift": {}}
+
+    time_order = ["baseline"] + [f"month{m}" for m in sorted(pd.to_numeric(df.loc[df["month"] > 0, "month"], errors="coerce").dropna().astype(int).unique())]
+    df["time"] = pd.Categorical(df["time"].astype(str), categories=time_order, ordered=True)
+    features = sorted(df["feature"].dropna().astype(str).unique())
+    summary_path = os.path.join(output_dir, f"{analysis_name}_domain_map_mixedlm_summary.csv")
+    if os.path.exists(summary_path):
+        try:
+            cached_summary = pd.read_csv(summary_path)
+        except Exception:
+            cached_summary = pd.DataFrame()
+        if (
+            not cached_summary.empty
+            and "feature" in cached_summary.columns
+            and set(cached_summary["feature"].dropna().astype(str)).issuperset(set(features))
+        ):
+            print(f"{analysis_name}: using cached domain-map mixed model summary ({len(cached_summary)} rows).", flush=True)
+            return {
+                "summary": cached_summary,
+                "mean_drift": {},
+                "mean_drift_summary_path": os.path.join(output_dir, f"{analysis_name}_domain_map_paths_mean_drift_sensitivity.csv"),
+                "mean_drift_raw_plot_path": os.path.join(output_dir, f"{analysis_name}_domain_map_paths_mean_drift_raw_trajectories.png"),
+                "mean_drift_change_plot_path": os.path.join(output_dir, f"{analysis_name}_domain_map_paths_mean_drift_change_scores.png"),
+            }
+
+    print(
+        f"{analysis_name}: fitting {len(features)} longitudinal features across "
+        f"{len(eligible_groups)} eligible domain-map paths.",
+        flush=True,
+    )
+
+    def _wald_term_values(result, term_name):
+        try:
+            term_table = result.wald_test_terms(skip_single=False).table
+        except Exception:
+            return np.nan, np.nan, np.nan
+        if term_name not in term_table.index:
+            return np.nan, np.nan, np.nan
+        row = term_table.loc[term_name]
+        statistic = row.get("statistic", np.nan)
+        if hasattr(statistic, "item"):
+            statistic = statistic.item()
+        p_value = row.get("pvalue", np.nan)
+        if hasattr(p_value, "item"):
+            p_value = p_value.item()
+        df_constraint = row.get("df_constraint", np.nan)
+        if hasattr(df_constraint, "item"):
+            df_constraint = df_constraint.item()
+        return float(statistic), float(p_value), float(df_constraint)
+
+    rows = []
+    for feature_idx, feat in enumerate(features, start=1):
+        print(f"{analysis_name}: feature {feature_idx}/{len(features)} - {feat}", flush=True)
+        tmp = df.loc[df["feature"].astype(str).eq(str(feat)), [_subject_id_column, "label", "time", "month", "value"]].dropna().copy()
+        tmp["group"] = tmp["label"].astype(str)
+        tmp["time"] = tmp["time"].cat.remove_unused_categories()
+        group_counts = tmp.drop_duplicates([_subject_id_column, "group"])["group"].value_counts()
+        followup_months = sorted(int(m) for m in pd.to_numeric(tmp.loc[tmp["month"] > 0, "month"], errors="coerce").dropna().unique())
+        if tmp["time"].nunique() < 2 or not followup_months:
+            rows.append({"analysis_name": analysis_name, "feature": feat, "status": "too_few_timepoints"})
+            continue
+        if group_counts.shape[0] < 2 or group_counts.min() < min_group_n:
+            rows.append({
+                "analysis_name": analysis_name,
+                "feature": feat,
+                "status": "too_few_subjects_or_groups",
+                "n_subjects": int(tmp[_subject_id_column].nunique()),
+                "n_groups": int(group_counts.shape[0]),
+                "min_group_n": int(group_counts.min()) if not group_counts.empty else 0,
+            })
+            continue
+        try:
+            full = smf.mixedlm(
+                "value ~ C(group) * C(time)",
+                tmp,
+                groups=tmp[_subject_id_column],
+            ).fit(reml=False, method="lbfgs", disp=False, maxiter=200)
+            group_wald, group_p, group_df = _wald_term_values(full, "C(group)")
+            time_wald, time_p, time_df = _wald_term_values(full, "C(time)")
+            interaction_wald, interaction_p, interaction_df = _wald_term_values(full, "C(group):C(time)")
+            status = "ok"
+        except Exception as exc:
+            rows.append({
+                "analysis_name": analysis_name,
+                "feature": feat,
+                "status": f"model_failed: {exc}",
+                "n_subjects": int(tmp[_subject_id_column].nunique()),
+                "n_groups": int(group_counts.shape[0]),
+                "min_group_n": int(group_counts.min()) if not group_counts.empty else 0,
+            })
+            continue
+
+        means = tmp.groupby(["group", "time"], observed=False)["value"].mean().unstack()
+        mean_row = {
+            f"Mean {group} {time}": float(value)
+            for group, values in means.iterrows()
+            for time, value in values.items()
+            if pd.notna(value)
+        }
+        rows.append({
+            "analysis_name": analysis_name,
+            "feature": feat,
+            "status": status,
+            "n_subjects": int(tmp[_subject_id_column].nunique()),
+            "n_observations": int(tmp.shape[0]),
+            "n_groups": int(group_counts.shape[0]),
+            "min_group_n": int(group_counts.min()),
+            "n_timepoints": int(tmp["time"].nunique()),
+            "n_followup_timepoints": int(len(followup_months)),
+            "followup_months_in_model": ",".join(map(str, followup_months)),
+            "test_type": "mixedlm_wald_terms",
+            "group_wald_chi2": group_wald,
+            "group_df": group_df,
+            "group_p": group_p,
+            "time_wald_chi2": time_wald,
+            "time_df": time_df,
+            "time_p": time_p,
+            "interaction_wald_chi2": interaction_wald,
+            "interaction_df": interaction_df,
+            "interaction_p": interaction_p,
+            **mean_row,
+        })
+
+    summary = pd.DataFrame(rows)
+    print(f"{analysis_name}: finished model fitting; writing summary and plots.", flush=True)
+    for col in ["group_p", "time_p", "interaction_p"]:
+        summary[f"{col}_fdr"] = np.nan
+        ok = summary[col].notna() if col in summary.columns else pd.Series(False, index=summary.index)
+        if ok.any():
+            summary.loc[ok, f"{col}_fdr"] = multipletests(summary.loc[ok, col], method="fdr_bh")[1]
+    sort_cols = [c for c in ["interaction_p_fdr", "interaction_p", "time_p_fdr", "group_p_fdr"] if c in summary.columns]
+    if sort_cols:
+        summary = summary.sort_values(sort_cols, na_position="last")
+    summary.to_csv(summary_path, index=False)
+
+    ok_features = summary.loc[summary["status"].eq("ok"), "feature"].astype(str).head(top_n_plot).tolist() if "status" in summary else []
+    if ok_features:
+        all_plot_groups = df.drop_duplicates([_subject_id_column, "label"])["label"].value_counts().index.astype(str).tolist()
+        plot_group_order = all_plot_groups if max_plot_groups is None else all_plot_groups[:max_plot_groups]
+        pd.DataFrame({
+            "plot_group": [f"Path {idx + 1}" for idx in range(len(all_plot_groups))],
+            "domain_map_path": all_plot_groups,
+            "shown_in_top_feature_plot": [group in set(plot_group_order) for group in all_plot_groups],
+        }).to_csv(os.path.join(output_dir, f"{analysis_name}_domain_map_plot_path_lookup.csv"), index=False)
+        ncols = min(3, len(ok_features))
+        nrows = int(np.ceil(len(ok_features) / ncols))
+        fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(5.8 * ncols, 4.6 * nrows), squeeze=False)
+        for ax, feat in zip(axes.ravel(), ok_features):
+            tmp = df.loc[df["feature"].astype(str).eq(str(feat))].dropna(subset=["value", "label"]).copy()
+            time_order_feature = [str(t) for t in tmp["time"].cat.categories if (tmp["time"].astype(str) == str(t)).any()]
+            group_order = plot_group_order
+            palette_base = sns.color_palette("tab20", n_colors=max(20, len(group_order)))
+            palette = {group: palette_base[idx % len(palette_base)] for idx, group in enumerate(group_order)}
+            x_positions = {time: idx for idx, time in enumerate(time_order_feature)}
+            for group in group_order:
+                group_tmp = tmp.loc[tmp["label"].astype(str).eq(group)]
+                stats = group_tmp.groupby("time", observed=False)["value"].agg(["mean", "count", "std"]).reindex(time_order_feature).dropna(subset=["mean"])
+                if stats.empty:
+                    continue
+                stats["se"] = stats["std"] / np.sqrt(stats["count"].clip(lower=1))
+                xs = [x_positions[str(t)] for t in stats.index.astype(str)]
+                ax.errorbar(
+                    xs,
+                    stats["mean"],
+                    yerr=stats["se"].fillna(0.0),
+                    marker="o",
+                    linewidth=1.8,
+                    capsize=3,
+                    label=f"Path {group_order.index(group) + 1}: {group}",
+                    color=palette.get(group, None),
+                )
+            row = summary.loc[summary["feature"].astype(str).eq(str(feat))].iloc[0]
+            ax.set_title(Utils.display_feature_name(feat), pad=24)
+            ax.text(
+                0.5,
+                1.01,
+                f"group q={row.get('group_p_fdr', np.nan):.3g}; time q={row.get('time_p_fdr', np.nan):.3g}; group*time q={row.get('interaction_p_fdr', np.nan):.3g}",
+                transform=ax.transAxes,
+                ha="center",
+                va="bottom",
+                fontsize=8,
+            )
+            ax.set_xticks(list(range(len(time_order_feature))))
+            ax.set_xticklabels(time_order_feature, rotation=35, ha="right")
+            ax.set_xlabel("")
+            ax.set_ylabel("Mean value")
+            ax.grid(axis="y", alpha=0.2)
+            if len(group_order) <= 12:
+                ax.legend(frameon=False, fontsize=6, title="Domain-map paths", loc="best")
+            elif ax is axes.ravel()[0]:
+                ax.text(
+                    0.01,
+                    -0.23,
+                    f"Showing {len(group_order)} eligible domain-map paths; see the plot-path lookup CSV for labels.",
+                    transform=ax.transAxes,
+                    ha="left",
+                    va="top",
+                    fontsize=8,
+                )
+            sns.despine(ax=ax)
+        for ax in axes.ravel()[len(ok_features):]:
+            ax.axis("off")
+        fig.tight_layout()
+        Utils._save_longitudinal_matplotlib_image(
+            fig,
+            os.path.join(output_dir, f"{analysis_name}_domain_map_mixedlm_top_features.png"),
+            dpi=300,
+            bbox_inches="tight",
+        )
+        plt.close(fig)
+
+    mean_drift = Utils._run_mean_drift_sensitivity(
+        long_df=df,
+        features=features,
+        output_dir=output_dir,
+        analysis_name=f"{analysis_name}_domain_map_paths",
+        subject_id_column=_subject_id_column,
+        features_to_plot=[],
+        min_group_n=min_group_n,
+        top_n_plot=0,
+    )
+    return {
+        "summary": summary,
+        "mean_drift": mean_drift,
+        "mean_drift_summary_path": mean_drift.get("summary_path", ""),
+        "mean_drift_raw_plot_path": mean_drift.get("raw_plot_path", ""),
+        "mean_drift_change_plot_path": mean_drift.get("change_plot_path", ""),
+    }
+
+
+@_with_notebook_context
+def clinical_analysis_normalise_longitudinal_feature(analysis_name, feature_name):
+    """Process clinical analysis normalise longitudinal feature."""
+    feature_name = str(feature_name)
+    if "__" in feature_name:
+        feature_domain, raw_feature = feature_name.split("__", 1)
+        return feature_domain, raw_feature
+    return str(analysis_name), feature_name
+
+
+@_with_notebook_context
+def clinical_analysis_read_longitudinal_mixedlm_summary(path, grouping_scheme, sample_name, analysis_name, path_variant=""):
+    """Process clinical analysis read longitudinal mixedlm summary."""
+    if not os.path.exists(path):
+        return []
+    summary = pd.read_csv(path)
+    rows = []
+    for _, row in summary.iterrows():
+        feature_domain, raw_feature = clinical_analysis_normalise_longitudinal_feature(
+            analysis_name,
+            row.get("feature", ""),
+        )
+        rows.append({
+            "grouping_scheme": grouping_scheme,
+            "path_variant": path_variant,
+            "sample": sample_name,
+            "analysis": analysis_name,
+            "feature_domain": feature_domain,
+            "feature": raw_feature,
+            "original_feature": row.get("feature", ""),
+            "status": row.get("status", ""),
+            "n_subjects": row.get("n_subjects", np.nan),
+            "n_groups": row.get("n_groups", np.nan),
+            "n_timepoints": row.get("n_timepoints", np.nan),
+            "group_q": row.get("group_p_fdr", np.nan),
+            "time_q": row.get("time_p_fdr", np.nan),
+            "interaction_q": row.get("interaction_p_fdr", np.nan),
+            "source_path": path,
+        })
+    return rows
+
+
+@_with_notebook_context
+def clinical_analysis_load_longitudinal_grouping_scheme_results():
+    """Process clinical analysis load longitudinal grouping scheme results."""
+    rows = []
+    for sample_name in ["discovery", "validation"]:
+        for analysis_name in _LONGITUDINAL_ANALYSES:
+            standard_path = os.path.join(
+                _LONGITUDINAL_ALL_DIR,
+                sample_name,
+                analysis_name,
+                "mixedlm",
+                f"{sample_name}_{analysis_name}_mixedlm_summary.csv",
+            )
+            grouping_scheme = (
+                "integrated_subgroups"
+                if analysis_name == "integrated"
+                else "individual_domain_subgroups"
+            )
+            rows.extend(clinical_analysis_read_longitudinal_mixedlm_summary(
+                standard_path,
+                grouping_scheme=grouping_scheme,
+                sample_name=sample_name,
+                analysis_name=analysis_name,
+            ))
+
+            domain_map_path = os.path.join(
+                _DOMAIN_MAP_PATH_DIR,
+                sample_name,
+                analysis_name,
+                f"{sample_name}_{analysis_name}_domains_only_domain_map_mixedlm_summary.csv",
+            )
+            rows.extend(clinical_analysis_read_longitudinal_mixedlm_summary(
+                domain_map_path,
+                grouping_scheme="domain_map_paths",
+                sample_name=sample_name,
+                analysis_name=analysis_name,
+                path_variant="domains_only",
+            ))
+
+    results = pd.DataFrame(rows)
+    for col in ["group_q", "time_q", "interaction_q", "n_subjects", "n_groups", "n_timepoints"]:
+        results[col] = pd.to_numeric(results[col], errors="coerce")
+    results["ok"] = results["status"].eq("ok")
+    results["group_sig"] = results["ok"] & results["group_q"].lt(0.05)
+    results["time_sig"] = results["ok"] & results["time_q"].lt(0.05)
+    results["interaction_sig"] = results["ok"] & results["interaction_q"].lt(0.05)
+    return results
+
+
+@_with_notebook_context
+def clinical_analysis_normalize_subject_id(value):
+    """Process clinical analysis normalize subject id."""
+    if pd.isna(value):
+        return None
+    value = str(value).strip().lower()
+    if value in {"", "nan", "none"}:
+        return None
+    return value
+
+
+@_with_notebook_context
+def clinical_analysis_make_conversion_labels(subject_ids, conversion_subjects):
+    """Process clinical analysis make conversion labels."""
+    conversion_subjects_normalized = {
+        sid for sid in (clinical_analysis_normalize_subject_id(s) for s in conversion_subjects)
+        if sid is not None
+    }
+    subject_ids_normalized = pd.Series(subject_ids).map(clinical_analysis_normalize_subject_id).reset_index(drop=True)
+    return np.where(
+        subject_ids_normalized.isin(conversion_subjects_normalized),
+        "yes",
+        "no",
+    ).tolist(), conversion_subjects_normalized, set(subject_ids_normalized.dropna())
+
+
+@_with_notebook_context
+def clinical_analysis_plot_conversion_domain_map(sample_name, labels_by_modality, subject_ids, conversion_subjects, save_file_name):
+    """Process clinical analysis plot conversion domain map."""
+    conversion_labels, conversion_ids, sample_ids = clinical_analysis_make_conversion_labels(subject_ids, conversion_subjects)
+    n_subjects = len(subject_ids)
+
+    if not all(len(labels_by_modality[stage]) == n_subjects for stage in stage_order):
+        label_lengths = {stage: len(labels_by_modality[stage]) for stage in stage_order}
+        raise ValueError(
+            f"{sample_name}: label lengths do not match subject IDs. "
+            f"subject_ids={n_subjects}, label_lengths={label_lengths}"
+        )
+
+    conversion_counts = pd.Series(
+        conversion_labels,
+        name="converted_to_psychosis",
+    ).value_counts()
+    print(f"Conversion labels mapped to {sample_name} subjects:")
+    print(conversion_counts)
+    print(
+        f"{sample_name}: {len(conversion_ids & sample_ids)} of "
+        f"{len(conversion_ids)} raw conversion IDs are present in this clustered sample."
+    )
+
+    fig, _ = domain_map(
+        new_labels_by_modality=labels_by_modality,
+        final_labels=conversion_labels,
+        stage_order=stage_order,
+        final_name="Conversion",
+        top_token="high_severity",
+        bottom_token="low_severity",
+        final_top_value="yes",
+        final_bottom_value="no",
+        color_for_top_final="#B64242",
+        color_for_bottom_final="#B3D9D5",
+        add_gap_in_final=True,
+        gap_weight=20,
+        title=f"Domain mapping by psychosis conversion ({sample_name})",
+        plots_dir=plots_dir,
+        save_file_name=save_file_name,
+    )
+    return fig, conversion_labels
+
+
+@_with_notebook_context
+def clinical_analysis_build_profile_predictor_df(labels_by_modality, subject_ids, conversion_labels):
+    """Process clinical analysis build profile predictor df."""
+    df = pd.DataFrame({"src_subject_id": pd.Series(subject_ids).astype(str).reset_index(drop=True)})
+    for stage in stage_order:
+        df[stage] = pd.Series(labels_by_modality[stage]).astype(str).reset_index(drop=True)
+    df["clinical_profile"] = df[stage_order].agg(" | ".join, axis=1)
+    df["n_high_severity_domains"] = df[stage_order].eq("high_severity").sum(axis=1)
+    df["converted_to_psychosis"] = pd.Series(conversion_labels).astype(str).reset_index(drop=True)
+    return df
+
+
+@_with_notebook_context
+def clinical_analysis_encode_profile_predictors(df, reference_columns=None):
+    """Process clinical analysis encode profile predictors."""
+    encoded = pd.get_dummies(
+        df[categorical_predictors],
+        prefix=categorical_predictors,
+        dtype=float,
+    )
+    encoded = pd.concat(
+        [encoded.reset_index(drop=True), df[numeric_predictors].astype(float).reset_index(drop=True)],
+        axis=1,
+    )
+    if reference_columns is not None:
+        encoded = encoded.reindex(columns=reference_columns, fill_value=0.0)
+    return encoded
+
+
+@_with_notebook_context
+def clinical_analysis_build_preprocessed_conversion_feature_df(data_by_modality, subject_ids, conversion_labels, sample_name):
+    """Merge the saved preprocessed clustering variables into one wide matrix."""
+    merged = None
+    for modality in stage_order:
+        if modality not in data_by_modality:
+            raise KeyError(f"{sample_name}: missing modality data for {modality}")
+
+        df_mod = data_by_modality[modality].copy()
+        if "src_subject_id" not in df_mod.columns:
+            raise KeyError(f"{sample_name} {modality}: src_subject_id column is missing")
+
+        feature_cols = [col for col in df_mod.columns if col != "src_subject_id"]
+        tmp = df_mod[["src_subject_id"] + feature_cols].copy()
+        tmp["src_subject_id"] = tmp["src_subject_id"].astype(str)
+        tmp = tmp.rename(columns={col: f"{modality}__{col}" for col in feature_cols})
+
+        merged = tmp if merged is None else merged.merge(tmp, on="src_subject_id", how="inner")
+
+    label_df = pd.DataFrame({
+        "src_subject_id": pd.Series(subject_ids).astype(str).reset_index(drop=True),
+        "converted_to_psychosis": pd.Series(conversion_labels).astype(str).reset_index(drop=True),
+    })
+    out = merged.merge(label_df, on="src_subject_id", how="inner")
+
+    if len(out) != len(label_df):
+        missing = sorted(set(label_df["src_subject_id"]) - set(out["src_subject_id"]))[:10]
+        print(
+            f"WARNING: {sample_name}: retained {len(out)} of {len(label_df)} subjects "
+            f"after merging modalities. Missing examples: {missing}"
+        )
+
+    return out
+
+
+# -----------------------------------------------------------------------------
+# clinical_paper analysis helpers
+# Implementations are preserved from the original notebook cells.
+# -----------------------------------------------------------------------------
+
+@_with_notebook_context
+def clinical_pipeline_truthy_profile_value(value):
+    """Process clinical pipeline truthy profile value."""
+    return str(value).strip().strip('"\'').upper() in {"TRUE", "1", "YES", "Y"}
+
+
+@_with_notebook_context
+def clinical_pipeline_parse_profile_exports(profile_path):
+    """Process clinical pipeline parse profile exports."""
+    exports = {}
+    if profile_path is None or not profile_path.exists():
+        return exports
+    for line in profile_path.read_text().splitlines():
+        line = line.strip()
+        if not line.startswith("export ") or "=" not in line:
+            continue
+        key, value = line[len("export "):].split("=", 1)
+        value = value.strip()
+        # Keep literal defaults such as ${VAR:-0} as-is; simple quoted values are enough for the flag check.
+        exports[key.strip()] = value.strip('"\'')
+    return exports
+
+
+@_with_notebook_context
+def clinical_pipeline_infer_notebook_profile():
+    """Process clinical pipeline infer notebook profile."""
+    notebook_dir = Path.cwd().name
+    profile_candidates = []
+    if notebook_dir == "clinical_paper":
+        profile_candidates.append("clinical_paper")
+    elif notebook_dir == "multiclust_extended":
+        profile_candidates.append("multiclust_extended")
+    elif notebook_dir == "prospect":
+        profile_candidates.append("prospect")
+    elif notebook_dir == "schizbull_legacy":
+        profile_candidates.append("schizbull_legacy")
+    profile_candidates.append(os.environ.get("RUN_PROFILE", ""))
+    for candidate in profile_candidates:
+        if candidate:
+            return candidate
+    return None
+
+
+@_with_notebook_context
+def clinical_pipeline_find_repo_root(start):
+    """Process clinical pipeline find repo root."""
+    start = Path(start).resolve()
+    for parent in [start] + list(start.parents):
+        if (parent / "run_profiles").is_dir() and (parent / "full_pipeline.py").exists():
+            return parent
+    return None
+
+
+@_with_notebook_context
+def clinical_pipeline_profile_enabled_for_sensitivity(repo_root, profile_name):
+    """Process clinical pipeline profile enabled for sensitivity."""
+    if not profile_name or repo_root is None:
+        return None, None
+    profile_path = repo_root / "run_profiles" / f"{profile_name}.sh"
+    exports = clinical_pipeline_parse_profile_exports(profile_path)
+    value = exports.get("DO_CLUSTER_VALIDATION_SENSITIVITY", "FALSE")
+    return clinical_pipeline_truthy_profile_value(value), profile_path
+
+
+@_with_notebook_context
+def clinical_pipeline_display_if_available(obj):
+    """Process clinical pipeline display if available."""
+    if "display" in globals():
+        display(obj)
+    else:
+        print(obj)
+
+
+@_with_notebook_context
+def clinical_pipeline_get_nested(dct, path, default=np.nan):
+    """Process clinical pipeline get nested."""
+    cur = dct
+    for key in path:
+        if not isinstance(cur, dict) or key not in cur:
+            return default
+        cur = cur[key]
+    return cur
+
+
+@_with_notebook_context
+def clinical_pipeline_flatten_sensitivity_results(results):
+    """Process clinical pipeline flatten sensitivity results."""
+    rows = []
+    for solution, payload in results.get("solutions", {}).items():
+        rows.append({
+            "solution": solution,
+            "kind": payload.get("kind"),
+            "observed_k": clinical_pipeline_get_nested(payload, ["observed_quality", "k"]),
+            "observed_n": clinical_pipeline_get_nested(payload, ["observed_quality", "n"]),
+            "observed_n_features": clinical_pipeline_get_nested(payload, ["observed_quality", "n_features"]),
+            "observed_composite": clinical_pipeline_get_nested(payload, ["observed_quality", "composite"]),
+            "observed_pipeline_stability_ari": clinical_pipeline_get_nested(payload, ["covariance_matched_gaussian_null", "observed_pipeline_stability_ari"]),
+            "observed_silhouette": clinical_pipeline_get_nested(payload, ["observed_quality", "silhouette"]),
+            "observed_calinski_harabasz": clinical_pipeline_get_nested(payload, ["observed_quality", "calinski_harabasz"]),
+            "observed_davies_bouldin": clinical_pipeline_get_nested(payload, ["observed_quality", "davies_bouldin"]),
+            "k1_composite": clinical_pipeline_get_nested(payload, ["uni_cluster_baseline", "quality", "composite"]),
+            "projection_pca_components": clinical_pipeline_get_nested(payload, ["projection_median_split", "pca_components"]),
+            "projection_pca_variance_explained": clinical_pipeline_get_nested(payload, ["projection_median_split", "pca_variance_explained"]),
+            "projection_median_best_quality_projection": clinical_pipeline_get_nested(payload, ["projection_median_split", "best_quality_projection"]),
+            "projection_median_best_quality_composite": clinical_pipeline_get_nested(payload, ["projection_median_split", "best_quality", "composite"]),
+            "projection_median_best_quality_ari_with_observed": clinical_pipeline_get_nested(payload, ["projection_median_split", "best_quality_ari_with_observed_labels"]),
+            "projection_median_best_ari_projection": clinical_pipeline_get_nested(payload, ["projection_median_split", "best_ari_projection"]),
+            "projection_median_best_ari_with_observed": clinical_pipeline_get_nested(payload, ["projection_median_split", "best_ari"]),
+            "projection_median_best_ari_composite": clinical_pipeline_get_nested(payload, ["projection_median_split", "best_ari_quality", "composite"]),
+            "projection_median_stability_ari": clinical_pipeline_get_nested(payload, ["projection_median_split", "bootstrap_stability", "mean_ari"]),
+            "projection_median_stability_sd_ari": clinical_pipeline_get_nested(payload, ["projection_median_split", "bootstrap_stability", "sd_ari"]),
+            "dip_available": clinical_pipeline_get_nested(payload, ["dip_test_projections", "available"], default=False),
+            "dip_global_projection_p_value": clinical_pipeline_get_nested(payload, ["dip_test_projections", "global_projection_p_value"]),
+            "dip_min_projection_p_value": clinical_pipeline_get_nested(payload, ["dip_test_projections", "min_projection_p_value"]),
+            "dip_bonferroni_min_p_value": clinical_pipeline_get_nested(payload, ["dip_test_projections", "bonferroni_min_p_value"]),
+            "dip_best_projection": clinical_pipeline_get_nested(payload, ["dip_test_projections", "best_projection"]),
+            "dip_pc1_p_value": clinical_pipeline_get_nested(payload, ["dip_test_projections", "pc1_p_value"]),
+            "gap_selected_k_tibshirani": clinical_pipeline_get_nested(payload, ["gap_statistic", "selected_k_tibshirani_rule"]),
+            "gap_selected_k_max_gap": clinical_pipeline_get_nested(payload, ["gap_statistic", "selected_k_max_gap"]),
+            "gap_method": clinical_pipeline_get_nested(payload, ["gap_statistic", "method"], default=""),
+            "sigclust_available": clinical_pipeline_get_nested(payload, ["sigclust", "available"], default=False),
+            "sigclust_cluster_index": clinical_pipeline_get_nested(payload, ["sigclust", "observed_cluster_index"]),
+            "sigclust_p_value": clinical_pipeline_get_nested(payload, ["sigclust", "p_value"]),
+            "sigclust_p_value_normal_approx": clinical_pipeline_get_nested(payload, ["sigclust", "p_value_normal_approx"]),
+            "sigclust_null_mean_cluster_index": clinical_pipeline_get_nested(payload, ["sigclust", "null_mean_cluster_index"]),
+            "gaussian_null_p_quality": clinical_pipeline_get_nested(payload, ["covariance_matched_gaussian_null", "p_quality_ge_observed_solution"]),
+            "gaussian_null_p_stability": clinical_pipeline_get_nested(payload, ["covariance_matched_gaussian_null", "p_stability_ge_observed_pipeline"]),
+            "gaussian_null_mean_stability_ari": clinical_pipeline_get_nested(payload, ["covariance_matched_gaussian_null", "null_stability_mean_ari"]),
+            "gaussian_null_mean_quality": clinical_pipeline_get_nested(payload, ["covariance_matched_gaussian_null", "null_quality_mean"]),
+        })
+    return pd.DataFrame(rows)
+
+
+@_with_notebook_context
+def clinical_pipeline_build_group_palette(modality, group_order, modality_palettes=None, default_palette=None):
+    """Process clinical pipeline build group palette."""
+    return modality_cluster_palette([str(g) for g in group_order], modality=modality)
+
+
+@_with_notebook_context
+def clinical_pipeline_add_metadata_and_clusters_individual_labels(final_metrics, data_full, mod_num):
+    """
+    Merge cluster labels into full metadata DataFrame using src_subject_id
+    from the actual training data stored in fold_metrics['data'].
+    This ensures correct alignment even when not all train_ids were clustered.
+    """
+    clusters = pd.Series(final_metrics['individual_labels'][mod_num])
+
+    # Get the first modality’s dataframe — all have the same subject order
+    modality_dfs = final_metrics.get('data', {})
+    if not modality_dfs:
+        raise ValueError("final_metrics['data'] is empty; cannot extract subject IDs.")
+
+    # Use the src_subject_id column from the first available modality
+    first_modality = list(modality_dfs.keys())[0]
+    subj_ids = modality_dfs[first_modality]['src_subject_id'].reset_index(drop=True)
+
+    # Sanity check: should match cluster array length
+    if len(subj_ids) != len(clusters):
+        print(f"⚠️ Mismatch: {len(subj_ids)} subject IDs vs {len(clusters)} cluster labels.")
+        min_len = min(len(subj_ids), len(clusters))
+        subj_ids = subj_ids.iloc[:min_len]
+        clusters = clusters.iloc[:min_len]
+        print(f"Trimmed both to {min_len} entries to align.")
+
+    # Build cluster mapping dataframe
+    cluster_df = pd.DataFrame({
+        'src_subject_id': subj_ids,
+        'Cluster': clusters
+    })
+
+    # Merge back into full metadata
+    merged = pd.merge(data_full, cluster_df, on='src_subject_id', how='left')
+
+    print(f"✅ Merged clusters for {merged['Cluster'].notna().sum()} subjects (out of {len(merged)} total).")
+    return merged
+
+
+@_with_notebook_context
+def clinical_pipeline_chi_square_comparison_individual_labels(df, group_col, label_col, title_prefix):
+    """
+    Perform chi-square test and plot grouped bar chart.
+    """
+    # Drop missing values
+    df = df.dropna(subset=[group_col, label_col])
+
+    # Make a copy for plotting / stats so we can safely relabel
+    df_plot = df.copy()
+
+    # Rename 'HC' -> 'CC' only for phenotype (for plotting and stats)
+    if label_col == 'phenotype':
+        df_plot[label_col] = df_plot[label_col].replace({'HC': 'CC'})
+
+    # 1. Summarize counts
+    summary_df = (
+        df_plot.groupby([group_col, label_col])
+        .size()
+        .reset_index(name='n')
+    )
+
+    # 2. Chi-square test
+    tbl = pd.crosstab(df_plot[group_col], df_plot[label_col])
+    chi2, pval, dof, expected = chi2_contingency(tbl)
+    pval = round(pval, 3)
+
+    # 3. Grouped bar chart
+    plt.figure(figsize=(8, 6))
+    sns.barplot(
+        data=summary_df,
+        x=group_col,
+        y='n',
+        hue=label_col,
+        dodge=True
+    )
+    plt.title(f"{title_prefix}\n(Chi-square p = {pval})")
+    plt.xlabel("Cluster")
+    plt.ylabel("Count")
+    sns.despine()
+    plt.tight_layout()
+    plt.show()
+
+
+@_with_notebook_context
+def clinical_pipeline_add_metadata_and_clusters_final_labels(final_metrics, data_full):
+    """
+    Merge cluster labels into full metadata DataFrame using src_subject_id
+    from the actual training data stored in fold_metrics['data'].
+    This ensures correct alignment even when not all train_ids were clustered.
+    """
+    clusters = pd.Series(final_metrics['final_labels'])
+
+    # Get the first modality’s dataframe — all have the same subject order
+    modality_dfs = final_metrics.get('data', {})
+    if not modality_dfs:
+        raise ValueError("final_metrics['data'] is empty; cannot extract subject IDs.")
+
+    # Use the src_subject_id column from the first available modality
+    first_modality = list(modality_dfs.keys())[0]
+    subj_ids = modality_dfs[first_modality]['src_subject_id'].reset_index(drop=True)
+
+    # Sanity check: should match cluster array length
+    if len(subj_ids) != len(clusters):
+        print(f"⚠️ Mismatch: {len(subj_ids)} subject IDs vs {len(clusters)} cluster labels.")
+        min_len = min(len(subj_ids), len(clusters))
+        subj_ids = subj_ids.iloc[:min_len]
+        clusters = clusters.iloc[:min_len]
+        print(f"Trimmed both to {min_len} entries to align.")
+
+    # Build cluster mapping dataframe
+    cluster_df = pd.DataFrame({
+        'src_subject_id': subj_ids,
+        'Cluster': clusters
+    })
+
+    # Merge back into full metadata
+    merged = pd.merge(data_full, cluster_df, on='src_subject_id', how='left')
+
+    print(f"✅ Merged clusters for {merged['Cluster'].notna().sum()} subjects (out of {len(merged)} total).")
+    return merged
+
+
+@_with_notebook_context
+def clinical_pipeline_chi_square_comparison_final_labels(df, group_col, label_col, title_prefix, save_path):
+    """
+    Perform chi-square test and plot grouped bar chart.
+    """
+    # Drop missing values
+    df = df.dropna(subset=[group_col, label_col])
+
+    # Make a copy for plotting / stats so we can safely relabel
+    df_plot = df.copy()
+
+    # Rename 'HC' -> 'CC' only for phenotype (for plotting and stats)
+    if label_col == 'phenotype':
+        df_plot[label_col] = df_plot[label_col].replace({'HC': 'CC'})
+
+    # 1. Summarize counts
+    summary_df = (
+        df_plot.groupby([group_col, label_col])
+        .size()
+        .reset_index(name='n')
+    )
+
+    # 2. Chi-square test
+    tbl = pd.crosstab(df_plot[group_col], df_plot[label_col])
+    chi2, pval, dof, expected = chi2_contingency(tbl)
+    pval = round(pval, 3)
+
+    # 3. Grouped bar chart
+    plt.figure(figsize=(8, 6))
+    sns.barplot(
+        data=summary_df,
+        x=group_col,
+        y='n',
+        hue=label_col,
+        dodge=True
+    )
+    plt.title(f"{title_prefix}\n(Chi-square p = {pval})")
+    plt.xlabel("Cluster")
+    plt.ylabel("Count")
+    sns.despine()
+    plt.tight_layout()
+    plt.savefig(save_path, dpi=1000)
+    plt.show()
+
+    # 4. Cluster summary (including CHR percentage if relevant)
+    cluster_summary = (
+        df_plot.groupby(group_col)
+        .agg(
+            Size=(group_col, 'size'),
+            CHR_percentage=(
+                label_col,
+                lambda x: (x.eq('CHR').sum() / len(x)) * 100
+                if 'CHR' in x.values else None
+            )
+        )
+        .reset_index()
+        .sort_values(group_col)
+    )
+    print(f"\nCluster summary for {title_prefix}")
+    print(cluster_summary)
+    print("\n" + "-"*60)
+
+
+@_with_notebook_context
+def clinical_pipeline_alluvial_sankey_force_high_top(
+    labels_by_modality: dict,
+    final_labels,
+    stage_order: list,
+    final_name="final",
+    high_token="high_severity",
+    low_token="low_severity",
+    final_order="auto",
+    arrangement="snap",
+    high_y=0.10,
+    low_y=0.90,
+    other_y=0.50,
+    node_pad=22,
+    node_thickness=18,
+    width=1400,
+    height=650,
+    title="All modalities -> final (alluvial Sankey)",
+):
+    """Process clinical pipeline alluvial sankey force high top."""
+    return alluvial_sankey_general(
+        labels_by_modality=labels_by_modality,
+        final_labels=final_labels,
+        stage_order=stage_order,
+        final_name=final_name,
+        high_token=high_token,
+        low_token=low_token,
+        final_order=final_order,
+        arrangement=arrangement,
+        high_y=high_y,
+        low_y=low_y,
+        other_y=other_y,
+        node_pad=node_pad,
+        node_thickness=node_thickness,
+        width=width,
+        height=height,
+        title=title,
+    )
+
+
+@_with_notebook_context
+def clinical_pipeline_summarize_streams(df_paths, stage_order, top_k=20, sample_ids=10):
+    """Process clinical pipeline summarize streams."""
+    group_cols = stage_order + ["final"]
+    total = len(df_paths)
+
+    g = (df_paths
+         .groupby(group_cols, dropna=False)
+         .agg(
+             n=("src_subject_id", "size"),
+             example_ids=("src_subject_id", lambda x: list(x.head(sample_ids))),
+         )
+         .reset_index()
+        )
+
+    g["pct"] = (g["n"] / total * 100).round(2)
+
+    # A readable "stream label"
+    def make_stream_label(row):
+        parts = [f"{c}={row[c]}" for c in stage_order] + [f"final={row['final']}"]
+        return " → ".join(parts)
+
+    g["stream"] = g.apply(make_stream_label, axis=1)
+
+    g = g.sort_values("n", ascending=False).head(top_k)
+
+    # Reorder columns nicely
+    cols = ["n", "pct", "stream", "example_ids"] + stage_order + ["final"]
+    return g[cols]
+
+
+@_with_notebook_context
+def clinical_pipeline_plot_pred_modality(df, name):
+    """
+    Plots confidence/uncertainty diagnostics for a single modality DataFrame.
+    Expected columns (any subset is ok): p_0, p_1, confidence, entropy, margin
+    """
+    cols = set(df.columns)
+
+    # Compute missing fields if probabilities exist
+    if {"p_0", "p_1"}.issubset(cols):
+        p0 = df["p_0"].astype(float).to_numpy()
+        p1 = df["p_1"].astype(float).to_numpy()
+
+        if "confidence" not in cols:
+            df = df.copy()
+            df["confidence"] = np.maximum(p0, p1)
+
+        if "margin" not in cols:
+            df = df.copy()
+            df["margin"] = np.abs(p1 - p0)
+
+        if "entropy" not in cols:
+            df = df.copy()
+            eps = 1e-12
+            df["entropy"] = -(p0 * np.log(p0 + eps) + p1 * np.log(p1 + eps))
+
+    # Helper to plot a histogram if column exists
+    def hist_if_exists(col, bins=30, xlabel=None):
+        if col in df.columns:
+            plt.figure()
+            plt.hist(df[col].dropna().astype(float), bins=bins)
+            plt.xlabel(xlabel or col)
+            plt.ylabel("Count")
+            plt.title(f"{name}: {col} distribution (unlabeled hold-out)")
+            plt.show()
+
+    # 1) Histograms
+    hist_if_exists("p_1", xlabel="Predicted probability p(class=1)")
+    hist_if_exists("confidence", xlabel="Confidence = max(p_0, p_1)")
+    hist_if_exists("entropy", xlabel="Entropy (higher = more uncertain)")
+    hist_if_exists("margin", xlabel="Margin = |p_1 - p_0| (lower = more uncertain)")
+
+    # 2) Scatter plots that are often informative
+    if ("confidence" in df.columns) and ("entropy" in df.columns):
+        plt.figure()
+        plt.scatter(df["confidence"].astype(float), df["entropy"].astype(float), s=10)
+        plt.xlabel("Confidence")
+        plt.ylabel("Entropy")
+        plt.title(f"{name}: confidence vs entropy")
+        plt.show()
+
+    if ("confidence" in df.columns) and ("margin" in df.columns):
+        plt.figure()
+        plt.scatter(df["confidence"].astype(float), df["margin"].astype(float), s=10)
+        plt.xlabel("Confidence")
+        plt.ylabel("Margin")
+        plt.title(f"{name}: confidence vs margin")
+        plt.show()
+
+    # 3) Print “most uncertain” cases (lowest confidence / lowest margin / highest entropy)
+    # (useful for manual review)
+    print(f"\n=== {name}: most uncertain examples ===")
+
+    if "confidence" in df.columns:
+        print("\nLowest confidence:")
+        display(df.sort_values("confidence", ascending=True).head(10))
+
+    if "margin" in df.columns:
+        print("\nLowest margin:")
+        display(df.sort_values("margin", ascending=True).head(10))
+
+    if "entropy" in df.columns:
+        print("\nHighest entropy:")
+        display(df.sort_values("entropy", ascending=False).head(10))
+
+
+@_with_notebook_context
+def clinical_pipeline_add_metadata_and_clusters_validation_individual_labels(dict_final, data_full, mod_num):
+    """
+    Merge cluster labels into full metadata DataFrame using src_subject_id
+    from the actual training data stored in fold_metrics['data'].
+    This ensures correct alignment even when not all train_ids were clustered.
+    """
+    clusters = pd.Series(labels_test_modalities[mod_num])
+
+    # Get the first modality’s dataframe — all have the same subject order
+    modality_dfs = dict_final
+    if not modality_dfs:
+        raise ValueError("dict_final is empty; cannot extract subject IDs.")
+
+    # Use the src_subject_id column from the first available modality
+    first_modality = list(modality_dfs.keys())[0]
+    subj_ids = modality_dfs[first_modality]['src_subject_id'].reset_index(drop=True)
+
+    # Sanity check: should match cluster array length
+    if len(subj_ids) != len(clusters):
+        print(f"⚠️ Mismatch: {len(subj_ids)} subject IDs vs {len(clusters)} cluster labels.")
+        min_len = min(len(subj_ids), len(clusters))
+        subj_ids = subj_ids.iloc[:min_len]
+        clusters = clusters.iloc[:min_len]
+        print(f"Trimmed both to {min_len} entries to align.")
+
+    # Build cluster mapping dataframe
+    cluster_df = pd.DataFrame({
+        'src_subject_id': subj_ids,
+        'Cluster': clusters
+    })
+
+    # Merge back into full metadata
+    merged = pd.merge(data_full, cluster_df, on='src_subject_id', how='left')
+
+    print(f"✅ Merged clusters for {merged['Cluster'].notna().sum()} subjects (out of {len(merged)} total).")
+    return merged
+
+
+@_with_notebook_context
+def clinical_pipeline_chi_square_comparison_validation_individual_labels(df, group_col, label_col, title_prefix):
+    """
+    Perform chi-square test and plot grouped bar chart.
+    """
+    # Drop missing values
+    df = df.dropna(subset=[group_col, label_col])
+
+    # Make a copy for plotting / stats so we can safely relabel
+    df_plot = df.copy()
+
+    # Rename 'HC' -> 'CC' only for phenotype (for plotting and stats)
+    if label_col == 'phenotype':
+        df_plot[label_col] = df_plot[label_col].replace({'HC': 'CC'})
+
+    # 1. Summarize counts
+    summary_df = (
+        df_plot.groupby([group_col, label_col])
+        .size()
+        .reset_index(name='n')
+    )
+
+    # 2. Chi-square test
+    tbl = pd.crosstab(df_plot[group_col], df_plot[label_col])
+    chi2, pval, dof, expected = chi2_contingency(tbl)
+    pval = round(pval, 3)
+
+    # 3. Grouped bar chart
+    plt.figure(figsize=(8, 6))
+    sns.barplot(
+        data=summary_df,
+        x=group_col,
+        y='n',
+        hue=label_col,
+        dodge=True
+    )
+    plt.title(f"{title_prefix}\n(Chi-square p = {pval})")
+    plt.xlabel("Cluster")
+    plt.ylabel("Count")
+    sns.despine()
+    plt.tight_layout()
+    plt.show()
+
+
+@_with_notebook_context
+def clinical_pipeline_parse_stream(stream_str):
+    """
+    Parse stream like:
+      "Psychoticism=low_severity → Detachment=high_severity → ... → final=1"
+    into ordered list of (domain, label).
+    """
+    if pd.isna(stream_str):
+        return []
+    parts = [p.strip() for p in ARROW_PAT.split(str(stream_str).strip()) if p.strip()]
+    out = []
+    for p in parts:
+        if "=" in p:
+            dom, lab = p.split("=", 1)
+            out.append((dom.strip(), lab.strip()))
+        else:
+            out.append((p.strip(), "<NA>"))
+    return out
+
+
+@_with_notebook_context
+def clinical_pipeline_infer_stage_order(df, stream_col="stream"):
+    """
+    Infer stage order from the first non-null stream.
+    Assumes all streams follow the same domain order.
+    """
+    s = df[stream_col].dropna().astype(str)
+    if s.empty:
+        raise ValueError("No streams found to infer stage order.")
+    path = clinical_pipeline_parse_stream(s.iloc[0])
+    return [d for d, _ in path]
+
+
+@_with_notebook_context
+def clinical_pipeline_normalize(v, eps=1e-12):
+    """Process clinical pipeline normalize."""
+    v = np.asarray(v, dtype=float)
+    s = v.sum()
+    if s <= 0:
+        return np.ones_like(v) / max(1, len(v))
+    return v / (s + eps)
+
+
+@_with_notebook_context
+def clinical_pipeline_build_prefix_next(df, stream_col="stream", n_col="n"):
+    """
+    Returns:
+      prefix_next: dict[prefix_tuple_of_(domain,label)] -> dict[next_token_(domain,label)|<END>] -> weight
+      prefix_mass: dict[prefix] -> total weight passing through prefix
+    Where prefix is a tuple of (domain,label) tokens, e.g.:
+      prefix = (("Psychoticism","low_severity"), ("Detachment","high_severity"))
+    and next token is the next (domain,label) or "<END>".
+    """
+    prefix_next = {}
+    prefix_mass = {}
+
+    for _, row in df.iterrows():
+        w = float(row.get(n_col, 1.0))
+        path = clinical_pipeline_parse_stream(row[stream_col])
+        if not path:
+            continue
+
+        # For each prefix (including empty prefix), record what comes next
+        for i in range(len(path)):
+            prefix = tuple(path[:i])  # empty prefix for i=0
+            nxt = path[i]             # next token
+            prefix_mass[prefix] = prefix_mass.get(prefix, 0.0) + w
+            d = prefix_next.setdefault(prefix, {})
+            d[nxt] = d.get(nxt, 0.0) + w
+
+        # terminal transition from full path to END
+        full_prefix = tuple(path)
+        prefix_mass[full_prefix] = prefix_mass.get(full_prefix, 0.0) + w
+        d = prefix_next.setdefault(full_prefix, {})
+        d["<END>"] = d.get("<END>", 0.0) + w
+
+    return prefix_next, prefix_mass
+
+
+@_with_notebook_context
+def clinical_pipeline_compare_prefix_structure(df_disc, df_test, stream_col="stream", n_col="n", eps=1e-12):
+    """
+    For each prefix, compare the conditional distribution over next tokens:
+        P_disc(next | prefix)  vs  P_test(next | prefix)
+
+    Returns DataFrame with:
+      - prefix_str
+      - depth
+      - js_next (Jensen–Shannon distance on next-step distributions)
+      - mass_disc / mass_test (how much data passes through prefix; useful for weighting but not "size-equality")
+      - top_next_disc / top_next_test (most likely next step)
+      - support_next_overlap (Jaccard on next-token supports)
+    """
+    pn_d, pm_d = clinical_pipeline_build_prefix_next(df_disc, stream_col, n_col)
+    pn_t, pm_t = clinical_pipeline_build_prefix_next(df_test, stream_col, n_col)
+
+    prefixes = set(pn_d.keys()) | set(pn_t.keys())
+
+    rows = []
+    for pref in prefixes:
+        nd = pn_d.get(pref, {})
+        nt = pn_t.get(pref, {})
+
+        keys = set(nd.keys()) | set(nt.keys())
+        # Align next-token vectors
+        vd = np.array([nd.get(k, 0.0) for k in keys], dtype=float)
+        vt = np.array([nt.get(k, 0.0) for k in keys], dtype=float)
+
+        pd_ = clinical_pipeline_normalize(vd, eps=eps)
+        pt_ = clinical_pipeline_normalize(vt, eps=eps)
+
+        js = float(jensenshannon(pd_ + eps, pt_ + eps, base=2.0))
+
+        # Next-token support overlap (presence/absence, structure)
+        supp_d = {k for k, v in nd.items() if v > 0}
+        supp_t = {k for k, v in nt.items() if v > 0}
+        supp_j = len(supp_d & supp_t) / max(1, len(supp_d | supp_t))
+
+        # Most likely next token in each
+        top_d = max(nd.items(), key=lambda x: x[1])[0] if nd else None
+        top_t = max(nt.items(), key=lambda x: x[1])[0] if nt else None
+
+        def tok_str(tok):
+            if tok == "<END>":
+                return "<END>"
+            if tok is None:
+                return "<NONE>"
+            return f"{tok[0]}={tok[1]}"
+
+        prefix_str = " → ".join([f"{d}={l}" for d, l in pref]) if pref else "<START>"
+        rows.append({
+            "prefix_str": prefix_str,
+            "depth": len(pref),
+            "js_next": js,
+            "mass_disc": pm_d.get(pref, 0.0),
+            "mass_test": pm_t.get(pref, 0.0),
+            "top_next_disc": tok_str(top_d),
+            "top_next_test": tok_str(top_t),
+            "support_next_jaccard": supp_j,
+            "prefix_exists_in_disc": pref in pn_d,
+            "prefix_exists_in_test": pref in pn_t,
+        })
+
+    out = pd.DataFrame(rows)
+    # A useful default sorting: prioritize structurally-different AND commonly-used prefixes
+    out["mass_min"] = np.minimum(out["mass_disc"], out["mass_test"])
+    out = out.sort_values(["mass_min", "js_next"], ascending=[False, False]).reset_index(drop=True)
+    return out
+
+
+@_with_notebook_context
+def clinical_pipeline_plot_top_prefix_differences(prefix_report, top_n=20, min_depth=1):
+    """
+    Barh plot of top prefixes by JS(next) after filtering.
+    """
+    d = prefix_report[prefix_report["depth"] >= min_depth].copy()
+    d = d.sort_values("js_next", ascending=False).head(top_n)
+
+    plt.figure(figsize=(11, max(4, 0.35 * len(d))))
+    y = np.arange(len(d))[::-1]
+    plt.barh(y, d["js_next"].iloc[::-1].to_numpy())
+    plt.yticks(y, d["prefix_str"].iloc[::-1].to_list(), fontsize=9)
+    plt.xlabel("Jensen–Shannon distance of P(next | prefix)")
+    plt.title("Most structurally different prefixes (next-step rule)")
+    plt.tight_layout()
+    plt.show()
+
+
+@_with_notebook_context
+def clinical_pipeline_final_mapping_table(df, stream_col="stream", n_col="n", final_domain="final"):
+    """
+    Builds a table over modality-prefixes (everything up to but excluding final)
+    with P(final=label | prefix) computed within each dataset.
+
+    Returns DataFrame:
+      prefix_str, final_label, weight
+    and also a pivoted table of P(final=...) by prefix.
+    """
+    rows = []
+    for _, row in df.iterrows():
+        w = float(row.get(n_col, 1.0))
+        path = clinical_pipeline_parse_stream(row[stream_col])
+        if not path:
+            continue
+
+        # split into prefix (before final) and final token
+        final_tokens = [t for t in path if t[0] == final_domain]
+        if not final_tokens:
+            # If final isn't explicitly present, skip
+            continue
+        final_tok = final_tokens[-1]  # in case of duplicates, take last
+        final_label = final_tok[1]
+
+        # prefix = all tokens before the final token position (first occurrence)
+        # more robust: take all tokens except the final-domain token(s)
+        prefix = tuple([t for t in path if t[0] != final_domain])
+
+        prefix_str = " → ".join([f"{d}={l}" for d, l in prefix]) if prefix else "<NO_MODALITIES>"
+        rows.append({"prefix_str": prefix_str, "final_label": final_label, "w": w})
+
+    long = pd.DataFrame(rows)
+    if long.empty:
+        return long, pd.DataFrame()
+
+    # Compute conditional probabilities P(final_label | prefix)
+    grp = long.groupby(["prefix_str", "final_label"], dropna=False)["w"].sum().reset_index()
+    totals = grp.groupby("prefix_str")["w"].sum().reset_index().rename(columns={"w": "w_total"})
+    grp = grp.merge(totals, on="prefix_str", how="left")
+    grp["p_final_given_prefix"] = grp["w"] / grp["w_total"]
+
+    pivot = grp.pivot_table(index="prefix_str", columns="final_label", values="p_final_given_prefix", fill_value=0.0)
+    return grp, pivot
+
+
+@_with_notebook_context
+def clinical_pipeline_compare_final_mapping(df_disc, df_test, stream_col="stream", n_col="n", final_domain="final"):
+    """
+    Compare P(final | modalities) between discovery and test.
+    Returns a table with per-prefix deltas per final label plus summary metrics.
+    """
+    long_d, piv_d = clinical_pipeline_final_mapping_table(df_disc, stream_col, n_col, final_domain)
+    long_t, piv_t = clinical_pipeline_final_mapping_table(df_test, stream_col, n_col, final_domain)
+
+    if piv_d.empty or piv_t.empty:
+        return pd.DataFrame(), {"note": "No final mapping found (missing final tokens?)"}
+
+    # align
+    idx = sorted(set(piv_d.index) | set(piv_t.index))
+    cols = sorted(set(piv_d.columns) | set(piv_t.columns))
+    A = piv_d.reindex(index=idx, columns=cols).fillna(0.0)
+    B = piv_t.reindex(index=idx, columns=cols).fillna(0.0)
+
+    # Delta per final label
+    delta = (B - A)
+    out = delta.copy()
+    out.columns = [f"delta_final={c}" for c in out.columns]
+    out.insert(0, "prefix_str", out.index)
+
+    # A per-prefix summary: JS distance between final distributions for that prefix
+    js_list = []
+    for i in range(A.shape[0]):
+        p = clinical_pipeline_normalize(A.iloc[i].to_numpy())
+        q = clinical_pipeline_normalize(B.iloc[i].to_numpy())
+        js_list.append(float(jensenshannon(p + 1e-12, q + 1e-12, base=2.0)))
+    out["js_final_given_prefix"] = js_list
+
+    # Add weights: how common the prefix is (within each dataset)
+    wD = long_d.groupby("prefix_str")["w"].sum() if not long_d.empty else pd.Series(dtype=float)
+    wT = long_t.groupby("prefix_str")["w"].sum() if not long_t.empty else pd.Series(dtype=float)
+    out["w_disc"] = out["prefix_str"].map(wD).fillna(0.0)
+    out["w_test"] = out["prefix_str"].map(wT).fillna(0.0)
+    out["w_min"] = np.minimum(out["w_disc"], out["w_test"])
+
+    # Sort by (common prefixes) then by biggest JS shift in final mapping
+    out = out.sort_values(["w_min", "js_final_given_prefix"], ascending=[False, False]).reset_index(drop=True)
+
+    # Global summary metric: weighted average JS over prefixes (weights = w_min)
+    w = out["w_min"].to_numpy()
+    if w.sum() > 0:
+        global_js = float(np.sum(out["js_final_given_prefix"].to_numpy() * w) / w.sum())
+    else:
+        global_js = float(out["js_final_given_prefix"].mean())
+
+    metrics = {
+        "num_prefixes_union": len(out),
+        "weighted_js_final_given_prefix": global_js,
+        "final_labels": cols,
+    }
+    return out, metrics
+
+
+@_with_notebook_context
+def clinical_pipeline_plot_top_final_mapping_shifts(final_cmp, top_n=20):
+    """Process clinical pipeline plot top final mapping shifts."""
+    d = final_cmp.head(top_n).copy()
+    plt.figure(figsize=(11, max(4, 0.35 * len(d))))
+    y = np.arange(len(d))[::-1]
+    plt.barh(y, d["js_final_given_prefix"].iloc[::-1].to_numpy())
+    plt.yticks(y, d["prefix_str"].iloc[::-1].to_list(), fontsize=9)
+    plt.xlabel("JS distance between P(final | prefix) in test vs discovery")
+    plt.title("Prefixes with biggest changes in final mapping")
+    plt.tight_layout()
+    plt.show()
+
+
+@_with_notebook_context
+def clinical_pipeline_stream_presence_and_topk(df_disc, df_test, stream_col="stream", n_col="n", topk=30):
+    """Process clinical pipeline stream presence and topk."""
+    A = set(df_disc[stream_col].dropna().astype(str))
+    B = set(df_test[stream_col].dropna().astype(str))
+
+    presence = {
+        "unique_streams_disc": len(A),
+        "unique_streams_test": len(B),
+        "stream_jaccard_presence": len(A & B) / max(1, len(A | B)),
+        "coverage_disc_in_test": len(A & B) / max(1, len(A)),
+        "coverage_test_in_disc": len(A & B) / max(1, len(B)),
+    }
+
+    pD = df_disc.groupby(stream_col)[n_col].sum().sort_values(ascending=False)
+    pT = df_test.groupby(stream_col)[n_col].sum().sort_values(ascending=False)
+    pD = pD / pD.sum()
+    pT = pT / pT.sum()
+
+    topD = set(pD.index[: min(topk, len(pD))].astype(str))
+    topT = set(pT.index[: min(topk, len(pT))].astype(str))
+
+    presence[f"top{topk}_jaccard_by_rank"] = len(topD & topT) / max(1, len(topD | topT))
+    presence["top_disc_only"] = sorted(list(topD - topT))[:10]
+    presence["top_test_only"] = sorted(list(topT - topD))[:10]
+    return presence, pD, pT
+
+
+@_with_notebook_context
+def clinical_pipeline_sankey_from_streams(df, stream_col="stream", n_col="n", max_edges=200):
+    """
+    Build a Sankey graph from full streams.
+    Nodes are stage-specific label tokens: f"{domain}={label}".
+    Edges connect consecutive tokens. We prune to max_edges by weight.
+    """
+    if not _HAS_PLOTLY:
+        raise RuntimeError("Plotly not installed; cannot draw sankey.")
+
+    edge_w = {}
+    for _, row in df.iterrows():
+        w = float(row.get(n_col, 1.0))
+        path = clinical_pipeline_parse_stream(row[stream_col])
+        toks = [f"{d}={l}" for d, l in path]
+        for a, b in zip(toks[:-1], toks[1:]):
+            edge_w[(a, b)] = edge_w.get((a, b), 0.0) + w
+
+    # prune
+    edges = sorted(edge_w.items(), key=lambda x: -x[1])[:max_edges]
+    nodes = {}
+    def nid(x):
+        if x not in nodes:
+            nodes[x] = len(nodes)
+        return nodes[x]
+
+    src, tgt, val = [], [], []
+    for (a, b), w in edges:
+        src.append(nid(a))
+        tgt.append(nid(b))
+        val.append(w)
+
+    labels = [None] * len(nodes)
+    for k, i in nodes.items():
+        labels[i] = k
+
+    fig = go.Figure(data=[go.Sankey(
+        node=dict(label=labels, pad=12, thickness=12),
+        link=dict(source=src, target=tgt, value=val),
+    )])
+    return fig
+
+
+@_with_notebook_context
+def clinical_pipeline_full_structure_report(stream_summary, stream_summary_test, stream_col="stream", n_col="n", topk=30, final_domain="final"):
+    # Presence + top-k overlap
+    """Process clinical pipeline full structure report."""
+    presence, pD, pT = clinical_pipeline_stream_presence_and_topk(stream_summary, stream_summary_test, stream_col, n_col, topk=topk)
+
+    # Prefix-tree structural differences
+    prefix_report = clinical_pipeline_compare_prefix_structure(stream_summary, stream_summary_test, stream_col, n_col)
+
+    # Full mapping to final
+    final_cmp, final_metrics = clinical_pipeline_compare_final_mapping(stream_summary, stream_summary_test, stream_col, n_col, final_domain)
+
+    return {
+        "presence_metrics": presence,
+        "p_stream_disc": pD,
+        "p_stream_test": pT,
+        "prefix_report": prefix_report,
+        "final_mapping_compare": final_cmp,
+        "final_mapping_metrics": final_metrics,
+    }
+
+
+@_with_notebook_context
+def clinical_pipeline_all_streams_table(stream_summary, stream_summary_test, stream_col="stream", n_col="n"):
+    # Aggregate in case there are duplicate stream rows
+    """Process clinical pipeline all streams table."""
+    disc = (stream_summary
+            .groupby(stream_col, dropna=False)[n_col]
+            .sum()
+            .rename("n_disc")
+            .to_frame())
+
+    test = (stream_summary_test
+            .groupby(stream_col, dropna=False)[n_col]
+            .sum()
+            .rename("n_test")
+            .to_frame())
+
+    # Outer join gives union of streams
+    tbl = disc.join(test, how="outer").fillna(0)
+
+    # Add proportions within each dataset
+    N_disc = tbl["n_disc"].sum()
+    N_test = tbl["n_test"].sum()
+
+    tbl["p_disc"] = tbl["n_disc"] / N_disc if N_disc > 0 else np.nan
+    tbl["p_test"] = tbl["n_test"] / N_test if N_test > 0 else np.nan
+
+    # Helpful comparisons
+    tbl["delta_p"] = tbl["p_test"] - tbl["p_disc"]
+    tbl["abs_delta_p"] = tbl["delta_p"].abs()
+    tbl["log2_fc"] = np.log2((tbl["p_test"] + 1e-12) / (tbl["p_disc"] + 1e-12))
+
+    # Make stream a real column, sort by biggest shift
+    tbl = tbl.reset_index().rename(columns={stream_col: "stream"})
+    tbl = tbl.sort_values("abs_delta_p", ascending=False).reset_index(drop=True)
+
+    return tbl
+
+
+# -----------------------------------------------------------------------------
+# multiclust_extended analysis helpers
+# Implementations are preserved from the original notebook cells.
+# -----------------------------------------------------------------------------
+
+@_with_notebook_context
+def multiclust_extended_print_remaining_after_full_missing_modality_removal(df, df_name, meta, modalities, subject_id_column="src_subject_id"):
+    """Process multiclust extended print remaining after full missing modality removal."""
+    modality_to_cols = {
+        modality: [
+            col for col in meta.loc[meta["Modality"] == modality, "ElementName"]
+            if col in df.columns
+        ]
+        for modality in modalities
+    }
+
+    full_missing_mask = pd.Series(False, index=df.index)
+    for cols in modality_to_cols.values():
+        if cols:
+            full_missing_mask |= df[cols].isna().all(axis=1)
+
+    print(
+        f"{df_name}: {(~full_missing_mask).sum()} participants remain "
+        f"after removing participants with >=1 fully missing modality "
+        f"({full_missing_mask.sum()} removed)."
+    )
+
+
+@_with_notebook_context
+def multiclust_extended_truthy_profile_value(value):
+    """Process multiclust extended truthy profile value."""
+    return str(value).strip().strip('"\'').upper() in {"TRUE", "1", "YES", "Y"}
+
+
+@_with_notebook_context
+def multiclust_extended_parse_profile_exports(profile_path):
+    """Process multiclust extended parse profile exports."""
+    exports = {}
+    if profile_path is None or not profile_path.exists():
+        return exports
+    for line in profile_path.read_text().splitlines():
+        line = line.strip()
+        if not line.startswith("export ") or "=" not in line:
+            continue
+        key, value = line[len("export "):].split("=", 1)
+        value = value.strip()
+        # Keep literal defaults such as ${VAR:-0} as-is; simple quoted values are enough for the flag check.
+        exports[key.strip()] = value.strip('"\'')
+    return exports
+
+
+@_with_notebook_context
+def multiclust_extended_infer_notebook_profile():
+    """Process multiclust extended infer notebook profile."""
+    notebook_dir = Path.cwd().name
+    profile_candidates = []
+    if notebook_dir == "clinical_paper":
+        profile_candidates.append("clinical_paper")
+    elif notebook_dir == "multiclust_extended":
+        profile_candidates.append("multiclust_extended")
+    elif notebook_dir == "prospect":
+        profile_candidates.append("prospect")
+    elif notebook_dir == "schizbull_legacy":
+        profile_candidates.append("schizbull_legacy")
+    profile_candidates.append(os.environ.get("RUN_PROFILE", ""))
+    for candidate in profile_candidates:
+        if candidate:
+            return candidate
+    return None
+
+
+@_with_notebook_context
+def multiclust_extended_find_repo_root(start):
+    """Process multiclust extended find repo root."""
+    start = Path(start).resolve()
+    for parent in [start] + list(start.parents):
+        if (parent / "run_profiles").is_dir() and (parent / "full_pipeline.py").exists():
+            return parent
+    return None
+
+
+@_with_notebook_context
+def multiclust_extended_profile_enabled_for_sensitivity(repo_root, profile_name):
+    """Process multiclust extended profile enabled for sensitivity."""
+    if not profile_name or repo_root is None:
+        return None, None
+    profile_path = repo_root / "run_profiles" / f"{profile_name}.sh"
+    exports = multiclust_extended_parse_profile_exports(profile_path)
+    value = exports.get("DO_CLUSTER_VALIDATION_SENSITIVITY", "FALSE")
+    return multiclust_extended_truthy_profile_value(value), profile_path
+
+
+@_with_notebook_context
+def multiclust_extended_display_if_available(obj):
+    """Process multiclust extended display if available."""
+    if "display" in globals():
+        display(obj)
+    else:
+        print(obj)
+
+
+@_with_notebook_context
+def multiclust_extended_get_nested(dct, path, default=np.nan):
+    """Process multiclust extended get nested."""
+    cur = dct
+    for key in path:
+        if not isinstance(cur, dict) or key not in cur:
+            return default
+        cur = cur[key]
+    return cur
+
+
+@_with_notebook_context
+def multiclust_extended_flatten_sensitivity_results(results):
+    """Process multiclust extended flatten sensitivity results."""
+    rows = []
+    for solution, payload in results.get("solutions", {}).items():
+        rows.append({
+            "solution": solution,
+            "kind": payload.get("kind"),
+            "observed_k": multiclust_extended_get_nested(payload, ["observed_quality", "k"]),
+            "observed_n": multiclust_extended_get_nested(payload, ["observed_quality", "n"]),
+            "observed_n_features": multiclust_extended_get_nested(payload, ["observed_quality", "n_features"]),
+            "observed_composite": multiclust_extended_get_nested(payload, ["observed_quality", "composite"]),
+            "observed_silhouette": multiclust_extended_get_nested(payload, ["observed_quality", "silhouette"]),
+            "observed_calinski_harabasz": multiclust_extended_get_nested(payload, ["observed_quality", "calinski_harabasz"]),
+            "observed_davies_bouldin": multiclust_extended_get_nested(payload, ["observed_quality", "davies_bouldin"]),
+            "k1_composite": multiclust_extended_get_nested(payload, ["uni_cluster_baseline", "quality", "composite"]),
+            "pc1_variance_explained": multiclust_extended_get_nested(payload, ["pc1_median_split", "pc1_variance_explained"]),
+            "pc1_median_composite": multiclust_extended_get_nested(payload, ["pc1_median_split", "quality", "composite"]),
+            "pc1_median_ari_with_observed": multiclust_extended_get_nested(payload, ["pc1_median_split", "ari_with_observed_labels"]),
+            "pc1_median_stability_ari": multiclust_extended_get_nested(payload, ["pc1_median_split", "bootstrap_stability", "mean_ari"]),
+            "pc1_median_stability_sd_ari": multiclust_extended_get_nested(payload, ["pc1_median_split", "bootstrap_stability", "sd_ari"]),
+            "dip_available": multiclust_extended_get_nested(payload, ["dip_test_pc1", "available"], default=False),
+            "dip_statistic_pc1": multiclust_extended_get_nested(payload, ["dip_test_pc1", "dip"]),
+            "dip_p_value_pc1": multiclust_extended_get_nested(payload, ["dip_test_pc1", "p_value"]),
+            "gap_selected_k_tibshirani": multiclust_extended_get_nested(payload, ["gap_statistic", "selected_k_tibshirani_rule"]),
+            "gap_selected_k_max_gap": multiclust_extended_get_nested(payload, ["gap_statistic", "selected_k_max_gap"]),
+            "sigclust_cluster_index": multiclust_extended_get_nested(payload, ["sigclust_approx", "observed_cluster_index"]),
+            "sigclust_p_value": multiclust_extended_get_nested(payload, ["sigclust_approx", "p_value"]),
+            "sigclust_null_mean_cluster_index": multiclust_extended_get_nested(payload, ["sigclust_approx", "null_mean_cluster_index"]),
+            "gaussian_null_p_quality": multiclust_extended_get_nested(payload, ["covariance_matched_gaussian_null", "p_quality_ge_observed_recluster"]),
+            "gaussian_null_p_stability": multiclust_extended_get_nested(payload, ["covariance_matched_gaussian_null", "p_stability_ge_observed_recluster"]),
+            "observed_recluster_stability_ari": multiclust_extended_get_nested(payload, ["covariance_matched_gaussian_null", "observed_recluster_stability", "mean_ari"]),
+            "gaussian_null_mean_stability_ari": multiclust_extended_get_nested(payload, ["covariance_matched_gaussian_null", "null_stability_mean_ari"]),
+            "gaussian_null_mean_quality": multiclust_extended_get_nested(payload, ["covariance_matched_gaussian_null", "null_quality_mean"]),
+        })
+    return pd.DataFrame(rows)
+
+
+@_with_notebook_context
+def multiclust_extended_build_group_palette(modality, group_order, modality_palettes=None, default_palette=None):
+    """Process multiclust extended build group palette."""
+    return modality_cluster_palette([str(g) for g in group_order], modality=modality)
+
+
+@_with_notebook_context
+def multiclust_extended_add_metadata_and_clusters_individual_labels(final_metrics, data_full, mod_num):
+    """
+    Merge cluster labels into full metadata DataFrame using src_subject_id
+    from the actual training data stored in fold_metrics['data'].
+    This ensures correct alignment even when not all train_ids were clustered.
+    """
+    clusters = pd.Series(final_metrics['individual_labels'][mod_num])
+
+    # Get the first modality’s dataframe — all have the same subject order
+    modality_dfs = final_metrics.get('data', {})
+    if not modality_dfs:
+        raise ValueError("final_metrics['data'] is empty; cannot extract subject IDs.")
+
+    # Use the src_subject_id column from the first available modality
+    first_modality = list(modality_dfs.keys())[0]
+    subj_ids = modality_dfs[first_modality]['src_subject_id'].reset_index(drop=True)
+
+    # Sanity check: should match cluster array length
+    if len(subj_ids) != len(clusters):
+        print(f"⚠️ Mismatch: {len(subj_ids)} subject IDs vs {len(clusters)} cluster labels.")
+        min_len = min(len(subj_ids), len(clusters))
+        subj_ids = subj_ids.iloc[:min_len]
+        clusters = clusters.iloc[:min_len]
+        print(f"Trimmed both to {min_len} entries to align.")
+
+    # Build cluster mapping dataframe
+    cluster_df = pd.DataFrame({
+        'src_subject_id': subj_ids,
+        'Cluster': clusters
+    })
+
+    # Merge back into full metadata
+    merged = pd.merge(data_full, cluster_df, on='src_subject_id', how='left')
+
+    print(f"✅ Merged clusters for {merged['Cluster'].notna().sum()} subjects (out of {len(merged)} total).")
+    return merged
+
+
+@_with_notebook_context
+def multiclust_extended_chi_square_comparison_individual_labels(df, group_col, label_col, title_prefix):
+    """
+    Perform chi-square test and plot grouped bar chart.
+    """
+    # Drop missing values
+    df = df.dropna(subset=[group_col, label_col])
+
+    # Make a copy for plotting / stats so we can safely relabel
+    df_plot = df.copy()
+
+    # Rename 'HC' -> 'CC' only for phenotype (for plotting and stats)
+    if label_col == 'phenotype':
+        df_plot[label_col] = df_plot[label_col].replace({'HC': 'CC'})
+
+    # 1. Summarize counts
+    summary_df = (
+        df_plot.groupby([group_col, label_col])
+        .size()
+        .reset_index(name='n')
+    )
+
+    # 2. Chi-square test
+    tbl = pd.crosstab(df_plot[group_col], df_plot[label_col])
+    chi2, pval, dof, expected = chi2_contingency(tbl)
+    pval = round(pval, 3)
+
+    # 3. Grouped bar chart
+    plt.figure(figsize=(8, 6))
+    sns.barplot(
+        data=summary_df,
+        x=group_col,
+        y='n',
+        hue=label_col,
+        dodge=True
+    )
+    plt.title(f"{title_prefix}\n(Chi-square p = {pval})")
+    plt.xlabel("Cluster")
+    plt.ylabel("Count")
+    sns.despine()
+    plt.tight_layout()
+    plt.show()
+
+
+@_with_notebook_context
+def multiclust_extended_add_metadata_and_clusters_final_labels(final_metrics, data_full):
+    """
+    Merge cluster labels into full metadata DataFrame using src_subject_id
+    from the actual training data stored in fold_metrics['data'].
+    This ensures correct alignment even when not all train_ids were clustered.
+    """
+    clusters = pd.Series(final_metrics['final_labels'])
+
+    # Get the first modality’s dataframe — all have the same subject order
+    modality_dfs = final_metrics.get('data', {})
+    if not modality_dfs:
+        raise ValueError("final_metrics['data'] is empty; cannot extract subject IDs.")
+
+    # Use the src_subject_id column from the first available modality
+    first_modality = list(modality_dfs.keys())[0]
+    subj_ids = modality_dfs[first_modality]['src_subject_id'].reset_index(drop=True)
+
+    # Sanity check: should match cluster array length
+    if len(subj_ids) != len(clusters):
+        print(f"⚠️ Mismatch: {len(subj_ids)} subject IDs vs {len(clusters)} cluster labels.")
+        min_len = min(len(subj_ids), len(clusters))
+        subj_ids = subj_ids.iloc[:min_len]
+        clusters = clusters.iloc[:min_len]
+        print(f"Trimmed both to {min_len} entries to align.")
+
+    # Build cluster mapping dataframe
+    cluster_df = pd.DataFrame({
+        'src_subject_id': subj_ids,
+        'Cluster': clusters
+    })
+
+    # Merge back into full metadata
+    merged = pd.merge(data_full, cluster_df, on='src_subject_id', how='left')
+
+    print(f"✅ Merged clusters for {merged['Cluster'].notna().sum()} subjects (out of {len(merged)} total).")
+    return merged
+
+
+@_with_notebook_context
+def multiclust_extended_chi_square_comparison_final_labels(df, group_col, label_col, title_prefix, save_path):
+    """
+    Perform chi-square test and plot grouped bar chart.
+    """
+    # Drop missing values
+    df = df.dropna(subset=[group_col, label_col])
+
+    # Make a copy for plotting / stats so we can safely relabel
+    df_plot = df.copy()
+
+    # Rename 'HC' -> 'CC' only for phenotype (for plotting and stats)
+    if label_col == 'phenotype':
+        df_plot[label_col] = df_plot[label_col].replace({'HC': 'CC'})
+
+    # 1. Summarize counts
+    summary_df = (
+        df_plot.groupby([group_col, label_col])
+        .size()
+        .reset_index(name='n')
+    )
+
+    # 2. Chi-square test
+    tbl = pd.crosstab(df_plot[group_col], df_plot[label_col])
+    chi2, pval, dof, expected = chi2_contingency(tbl)
+    pval = round(pval, 3)
+
+    # 3. Grouped bar chart
+    plt.figure(figsize=(8, 6))
+    sns.barplot(
+        data=summary_df,
+        x=group_col,
+        y='n',
+        hue=label_col,
+        dodge=True
+    )
+    plt.title(f"{title_prefix}\n(Chi-square p = {pval})")
+    plt.xlabel("Cluster")
+    plt.ylabel("Count")
+    sns.despine()
+    plt.tight_layout()
+    plt.savefig(save_path, dpi=1000)
+    plt.show()
+
+    # 4. Cluster summary (including CHR percentage if relevant)
+    cluster_summary = (
+        df_plot.groupby(group_col)
+        .agg(
+            Size=(group_col, 'size'),
+            CHR_percentage=(
+                label_col,
+                lambda x: (x.eq('CHR').sum() / len(x)) * 100
+                if 'CHR' in x.values else None
+            )
+        )
+        .reset_index()
+        .sort_values(group_col)
+    )
+    print(f"\nCluster summary for {title_prefix}")
+    print(cluster_summary)
+    print("\n" + "-"*60)
+
+
+@_with_notebook_context
+def multiclust_extended_alluvial_sankey_force_high_top(
+    labels_by_modality: dict,
+    final_labels,
+    stage_order: list,
+    final_name="final",
+    high_token="high_severity",
+    low_token="low_severity",
+    final_order="auto",
+    arrangement="snap",
+    high_y=0.10,
+    low_y=0.90,
+    other_y=0.50,
+    node_pad=22,
+    node_thickness=18,
+    width=1400,
+    height=650,
+    title="All modalities -> final (alluvial Sankey)",
+):
+    """Process multiclust extended alluvial sankey force high top."""
+    return alluvial_sankey_general(
+        labels_by_modality=labels_by_modality,
+        final_labels=final_labels,
+        stage_order=stage_order,
+        final_name=final_name,
+        high_token=high_token,
+        low_token=low_token,
+        final_order=final_order,
+        arrangement=arrangement,
+        high_y=high_y,
+        low_y=low_y,
+        other_y=other_y,
+        node_pad=node_pad,
+        node_thickness=node_thickness,
+        width=width,
+        height=height,
+        title=title,
+    )
+
+
+@_with_notebook_context
+def multiclust_extended_summarize_streams(df_paths, stage_order, top_k=20, sample_ids=10):
+    """Process multiclust extended summarize streams."""
+    group_cols = stage_order + ["final"]
+    total = len(df_paths)
+
+    g = (df_paths
+         .groupby(group_cols, dropna=False)
+         .agg(
+             n=("src_subject_id", "size"),
+             example_ids=("src_subject_id", lambda x: list(x.head(sample_ids))),
+         )
+         .reset_index()
+        )
+
+    g["pct"] = (g["n"] / total * 100).round(2)
+
+    # A readable "stream label"
+    def make_stream_label(row):
+        parts = [f"{c}={row[c]}" for c in stage_order] + [f"final={row['final']}"]
+        return " → ".join(parts)
+
+    g["stream"] = g.apply(make_stream_label, axis=1)
+
+    g = g.sort_values("n", ascending=False).head(top_k)
+
+    # Reorder columns nicely
+    cols = ["n", "pct", "stream", "example_ids"] + stage_order + ["final"]
+    return g[cols]
+
+
+@_with_notebook_context
+def multiclust_extended_summarize_streams_clinical(df_paths, stage_order, top_k=20, sample_ids=10):
+    """Process multiclust extended summarize streams clinical."""
+    group_cols = stage_order
+    total = len(df_paths)
+
+    g = (df_paths
+         .groupby(group_cols, dropna=False)
+         .agg(
+             n=("src_subject_id", "size"),
+             example_ids=("src_subject_id", lambda x: list(x.head(sample_ids))),
+         )
+         .reset_index()
+        )
+
+    g["pct"] = (g["n"] / total * 100).round(2)
+
+    # A readable "stream label"
+    def make_stream_label(row):
+        parts = [f"{c}={row[c]}" for c in stage_order]
+        return " → ".join(parts)
+
+    g["stream"] = g.apply(make_stream_label, axis=1)
+
+    g = g.sort_values("n", ascending=False).head(top_k)
+
+    # Reorder columns nicely
+    cols = ["n", "pct", "stream", "example_ids"] + stage_order
+    return g[cols]
+
+
+@_with_notebook_context
+def multiclust_extended_plot_pred_modality(df, name):
+    """
+    Plots confidence/uncertainty diagnostics for a single modality DataFrame.
+    Expected columns (any subset is ok): p_0, p_1, confidence, entropy, margin
+    """
+    cols = set(df.columns)
+
+    # Compute missing fields if probabilities exist
+    if {"p_0", "p_1"}.issubset(cols):
+        p0 = df["p_0"].astype(float).to_numpy()
+        p1 = df["p_1"].astype(float).to_numpy()
+
+        if "confidence" not in cols:
+            df = df.copy()
+            df["confidence"] = np.maximum(p0, p1)
+
+        if "margin" not in cols:
+            df = df.copy()
+            df["margin"] = np.abs(p1 - p0)
+
+        if "entropy" not in cols:
+            df = df.copy()
+            eps = 1e-12
+            df["entropy"] = -(p0 * np.log(p0 + eps) + p1 * np.log(p1 + eps))
+
+    # Helper to plot a histogram if column exists
+    def hist_if_exists(col, bins=30, xlabel=None):
+        if col in df.columns:
+            plt.figure()
+            plt.hist(df[col].dropna().astype(float), bins=bins)
+            plt.xlabel(xlabel or col)
+            plt.ylabel("Count")
+            plt.title(f"{name}: {col} distribution (unlabeled hold-out)")
+            plt.show()
+
+    # 1) Histograms
+    hist_if_exists("p_1", xlabel="Predicted probability p(class=1)")
+    hist_if_exists("confidence", xlabel="Confidence = max(p_0, p_1)")
+    hist_if_exists("entropy", xlabel="Entropy (higher = more uncertain)")
+    hist_if_exists("margin", xlabel="Margin = |p_1 - p_0| (lower = more uncertain)")
+
+    # 2) Scatter plots that are often informative
+    if ("confidence" in df.columns) and ("entropy" in df.columns):
+        plt.figure()
+        plt.scatter(df["confidence"].astype(float), df["entropy"].astype(float), s=10)
+        plt.xlabel("Confidence")
+        plt.ylabel("Entropy")
+        plt.title(f"{name}: confidence vs entropy")
+        plt.show()
+
+    if ("confidence" in df.columns) and ("margin" in df.columns):
+        plt.figure()
+        plt.scatter(df["confidence"].astype(float), df["margin"].astype(float), s=10)
+        plt.xlabel("Confidence")
+        plt.ylabel("Margin")
+        plt.title(f"{name}: confidence vs margin")
+        plt.show()
+
+    # 3) Print “most uncertain” cases (lowest confidence / lowest margin / highest entropy)
+    # (useful for manual review)
+    print(f"\n=== {name}: most uncertain examples ===")
+
+    if "confidence" in df.columns:
+        print("\nLowest confidence:")
+        display(df.sort_values("confidence", ascending=True).head(10))
+
+    if "margin" in df.columns:
+        print("\nLowest margin:")
+        display(df.sort_values("margin", ascending=True).head(10))
+
+    if "entropy" in df.columns:
+        print("\nHighest entropy:")
+        display(df.sort_values("entropy", ascending=False).head(10))
+
+
+@_with_notebook_context
+def multiclust_extended_add_metadata_and_clusters_validation_individual_labels(dict_final, data_full, mod_num):
+    """
+    Merge cluster labels into full metadata DataFrame using src_subject_id
+    from the actual training data stored in fold_metrics['data'].
+    This ensures correct alignment even when not all train_ids were clustered.
+    """
+    clusters = pd.Series(labels_test_modalities[mod_num])
+
+    # Get the first modality’s dataframe — all have the same subject order
+    modality_dfs = dict_final
+    if not modality_dfs:
+        raise ValueError("dict_final is empty; cannot extract subject IDs.")
+
+    # Use the src_subject_id column from the first available modality
+    first_modality = list(modality_dfs.keys())[0]
+    subj_ids = modality_dfs[first_modality]['src_subject_id'].reset_index(drop=True)
+
+    # Sanity check: should match cluster array length
+    if len(subj_ids) != len(clusters):
+        print(f"⚠️ Mismatch: {len(subj_ids)} subject IDs vs {len(clusters)} cluster labels.")
+        min_len = min(len(subj_ids), len(clusters))
+        subj_ids = subj_ids.iloc[:min_len]
+        clusters = clusters.iloc[:min_len]
+        print(f"Trimmed both to {min_len} entries to align.")
+
+    # Build cluster mapping dataframe
+    cluster_df = pd.DataFrame({
+        'src_subject_id': subj_ids,
+        'Cluster': clusters
+    })
+
+    # Merge back into full metadata
+    merged = pd.merge(data_full, cluster_df, on='src_subject_id', how='left')
+
+    print(f"✅ Merged clusters for {merged['Cluster'].notna().sum()} subjects (out of {len(merged)} total).")
+    return merged
+
+
+@_with_notebook_context
+def multiclust_extended_chi_square_comparison_validation_individual_labels(df, group_col, label_col, title_prefix):
+    """
+    Perform chi-square test and plot grouped bar chart.
+    """
+    # Drop missing values
+    df = df.dropna(subset=[group_col, label_col])
+
+    # Make a copy for plotting / stats so we can safely relabel
+    df_plot = df.copy()
+
+    # Rename 'HC' -> 'CC' only for phenotype (for plotting and stats)
+    if label_col == 'phenotype':
+        df_plot[label_col] = df_plot[label_col].replace({'HC': 'CC'})
+
+    # 1. Summarize counts
+    summary_df = (
+        df_plot.groupby([group_col, label_col])
+        .size()
+        .reset_index(name='n')
+    )
+
+    # 2. Chi-square test
+    tbl = pd.crosstab(df_plot[group_col], df_plot[label_col])
+    chi2, pval, dof, expected = chi2_contingency(tbl)
+    pval = round(pval, 3)
+
+    # 3. Grouped bar chart
+    plt.figure(figsize=(8, 6))
+    sns.barplot(
+        data=summary_df,
+        x=group_col,
+        y='n',
+        hue=label_col,
+        dodge=True
+    )
+    plt.title(f"{title_prefix}\n(Chi-square p = {pval})")
+    plt.xlabel("Cluster")
+    plt.ylabel("Count")
+    sns.despine()
+    plt.tight_layout()
+    plt.show()
+
+
+@_with_notebook_context
+def multiclust_extended_parse_stream(stream_str):
+    """
+    Parse stream like:
+      "Psychoticism=low -> Detachment=high -> ... -> final=1"
+    into ordered list of (domain, label).
+    """
+    if pd.isna(stream_str):
+        return []
+    parts = [p.strip() for p in ARROW_PAT.split(str(stream_str).strip()) if p.strip()]
+    out = []
+    for p in parts:
+        if "=" in p:
+            dom, lab = p.split("=", 1)
+            out.append((dom.strip(), lab.strip()))
+        else:
+            out.append((p.strip(), "<NA>"))
+    return out
+
+
+@_with_notebook_context
+def multiclust_extended_infer_stage_order(df, stream_col="stream"):
+    """
+    Infer stage order from the first non-null stream.
+    Assumes all streams follow the same domain order.
+    """
+    s = df[stream_col].dropna().astype(str)
+    if s.empty:
+        raise ValueError("No streams found to infer stage order.")
+    path = multiclust_extended_parse_stream(s.iloc[0])
+    return [d for d, _ in path]
+
+
+@_with_notebook_context
+def multiclust_extended_normalize(v, eps=1e-12):
+    """Process multiclust extended normalize."""
+    v = np.asarray(v, dtype=float)
+    s = v.sum()
+    if s <= 0:
+        return np.ones_like(v) / max(1, len(v))
+    return v / (s + eps)
+
+
+@_with_notebook_context
+def multiclust_extended_build_prefix_next(df, stream_col="stream", n_col="n"):
+    """
+    Returns:
+      prefix_next: dict[prefix_tuple_of_(domain,label)] -> dict[next_token_(domain,label)|<END>] -> weight
+      prefix_mass: dict[prefix] -> total weight passing through prefix
+    Where prefix is a tuple of (domain,label) tokens, e.g.:
+      prefix = (("Psychoticism","low"), ("Detachment","high"))
+    and next token is the next (domain,label) or "<END>".
+    """
+    prefix_next = {}
+    prefix_mass = {}
+
+    for _, row in df.iterrows():
+        w = float(row.get(n_col, 1.0))
+        path = multiclust_extended_parse_stream(row[stream_col])
+        if not path:
+            continue
+
+        # For each prefix (including empty prefix), record what comes next
+        for i in range(len(path)):
+            prefix = tuple(path[:i])  # empty prefix for i=0
+            nxt = path[i]             # next token
+            prefix_mass[prefix] = prefix_mass.get(prefix, 0.0) + w
+            d = prefix_next.setdefault(prefix, {})
+            d[nxt] = d.get(nxt, 0.0) + w
+
+        # terminal transition from full path to END
+        full_prefix = tuple(path)
+        prefix_mass[full_prefix] = prefix_mass.get(full_prefix, 0.0) + w
+        d = prefix_next.setdefault(full_prefix, {})
+        d["<END>"] = d.get("<END>", 0.0) + w
+
+    return prefix_next, prefix_mass
+
+
+@_with_notebook_context
+def multiclust_extended_compare_prefix_structure(df_disc, df_test, stream_col="stream", n_col="n", eps=1e-12):
+    """
+    For each prefix, compare the conditional distribution over next tokens:
+        P_disc(next | prefix)  vs  P_test(next | prefix)
+
+    Returns DataFrame with:
+      - prefix_str
+      - depth
+      - js_next (Jensen–Shannon distance on next-step distributions)
+      - mass_disc / mass_test (how much data passes through prefix; useful for weighting but not "size-equality")
+      - top_next_disc / top_next_test (most likely next step)
+      - support_next_overlap (Jaccard on next-token supports)
+    """
+    pn_d, pm_d = multiclust_extended_build_prefix_next(df_disc, stream_col, n_col)
+    pn_t, pm_t = multiclust_extended_build_prefix_next(df_test, stream_col, n_col)
+
+    prefixes = set(pn_d.keys()) | set(pn_t.keys())
+
+    rows = []
+    for pref in prefixes:
+        nd = pn_d.get(pref, {})
+        nt = pn_t.get(pref, {})
+
+        keys = set(nd.keys()) | set(nt.keys())
+        # Align next-token vectors
+        vd = np.array([nd.get(k, 0.0) for k in keys], dtype=float)
+        vt = np.array([nt.get(k, 0.0) for k in keys], dtype=float)
+
+        pd_ = multiclust_extended_normalize(vd, eps=eps)
+        pt_ = multiclust_extended_normalize(vt, eps=eps)
+
+        js = float(jensenshannon(pd_ + eps, pt_ + eps, base=2.0))
+
+        # Next-token support overlap (presence/absence, structure)
+        supp_d = {k for k, v in nd.items() if v > 0}
+        supp_t = {k for k, v in nt.items() if v > 0}
+        supp_j = len(supp_d & supp_t) / max(1, len(supp_d | supp_t))
+
+        # Most likely next token in each
+        top_d = max(nd.items(), key=lambda x: x[1])[0] if nd else None
+        top_t = max(nt.items(), key=lambda x: x[1])[0] if nt else None
+
+        def tok_str(tok):
+            if tok == "<END>":
+                return "<END>"
+            if tok is None:
+                return "<NONE>"
+            return f"{tok[0]}={tok[1]}"
+
+        prefix_str = " → ".join([f"{d}={l}" for d, l in pref]) if pref else "<START>"
+        rows.append({
+            "prefix_str": prefix_str,
+            "depth": len(pref),
+            "js_next": js,
+            "mass_disc": pm_d.get(pref, 0.0),
+            "mass_test": pm_t.get(pref, 0.0),
+            "top_next_disc": tok_str(top_d),
+            "top_next_test": tok_str(top_t),
+            "support_next_jaccard": supp_j,
+            "prefix_exists_in_disc": pref in pn_d,
+            "prefix_exists_in_test": pref in pn_t,
+        })
+
+    out = pd.DataFrame(rows)
+    # A useful default sorting: prioritize structurally-different AND commonly-used prefixes
+    out["mass_min"] = np.minimum(out["mass_disc"], out["mass_test"])
+    out = out.sort_values(["mass_min", "js_next"], ascending=[False, False]).reset_index(drop=True)
+    return out
+
+
+@_with_notebook_context
+def multiclust_extended_plot_top_prefix_differences(prefix_report, top_n=20, min_depth=1):
+    """
+    Barh plot of top prefixes by JS(next) after filtering.
+    """
+    d = prefix_report[prefix_report["depth"] >= min_depth].copy()
+    d = d.sort_values("js_next", ascending=False).head(top_n)
+
+    plt.figure(figsize=(11, max(4, 0.35 * len(d))))
+    y = np.arange(len(d))[::-1]
+    plt.barh(y, d["js_next"].iloc[::-1].to_numpy())
+    plt.yticks(y, d["prefix_str"].iloc[::-1].to_list(), fontsize=9)
+    plt.xlabel("Jensen–Shannon distance of P(next | prefix)")
+    plt.title("Most structurally different prefixes (next-step rule)")
+    plt.tight_layout()
+    plt.show()
+
+
+@_with_notebook_context
+def multiclust_extended_final_mapping_table(df, stream_col="stream", n_col="n", final_domain="final"):
+    """
+    Builds a table over modality-prefixes (everything up to but excluding final)
+    with P(final=label | prefix) computed within each dataset.
+
+    Returns DataFrame:
+      prefix_str, final_label, weight
+    and also a pivoted table of P(final=...) by prefix.
+    """
+    rows = []
+    for _, row in df.iterrows():
+        w = float(row.get(n_col, 1.0))
+        path = multiclust_extended_parse_stream(row[stream_col])
+        if not path:
+            continue
+
+        # split into prefix (before final) and final token
+        final_tokens = [t for t in path if t[0] == final_domain]
+        if not final_tokens:
+            # If final isn't explicitly present, skip
+            continue
+        final_tok = final_tokens[-1]  # in case of duplicates, take last
+        final_label = final_tok[1]
+
+        # prefix = all tokens before the final token position (first occurrence)
+        # more robust: take all tokens except the final-domain token(s)
+        prefix = tuple([t for t in path if t[0] != final_domain])
+
+        prefix_str = " → ".join([f"{d}={l}" for d, l in prefix]) if prefix else "<NO_MODALITIES>"
+        rows.append({"prefix_str": prefix_str, "final_label": final_label, "w": w})
+
+    long = pd.DataFrame(rows)
+    if long.empty:
+        return long, pd.DataFrame()
+
+    # Compute conditional probabilities P(final_label | prefix)
+    grp = long.groupby(["prefix_str", "final_label"], dropna=False)["w"].sum().reset_index()
+    totals = grp.groupby("prefix_str")["w"].sum().reset_index().rename(columns={"w": "w_total"})
+    grp = grp.merge(totals, on="prefix_str", how="left")
+    grp["p_final_given_prefix"] = grp["w"] / grp["w_total"]
+
+    pivot = grp.pivot_table(index="prefix_str", columns="final_label", values="p_final_given_prefix", fill_value=0.0)
+    return grp, pivot
+
+
+@_with_notebook_context
+def multiclust_extended_compare_final_mapping(df_disc, df_test, stream_col="stream", n_col="n", final_domain="final"):
+    """
+    Compare P(final | modalities) between discovery and test.
+    Returns a table with per-prefix deltas per final label plus summary metrics.
+    """
+    long_d, piv_d = multiclust_extended_final_mapping_table(df_disc, stream_col, n_col, final_domain)
+    long_t, piv_t = multiclust_extended_final_mapping_table(df_test, stream_col, n_col, final_domain)
+
+    if piv_d.empty or piv_t.empty:
+        return pd.DataFrame(), {"note": "No final mapping found (missing final tokens?)"}
+
+    # align
+    idx = sorted(set(piv_d.index) | set(piv_t.index))
+    cols = sorted(set(piv_d.columns) | set(piv_t.columns))
+    A = piv_d.reindex(index=idx, columns=cols).fillna(0.0)
+    B = piv_t.reindex(index=idx, columns=cols).fillna(0.0)
+
+    # Delta per final label
+    delta = (B - A)
+    out = delta.copy()
+    out.columns = [f"delta_final={c}" for c in out.columns]
+    out.insert(0, "prefix_str", out.index)
+
+    # A per-prefix summary: JS distance between final distributions for that prefix
+    js_list = []
+    for i in range(A.shape[0]):
+        p = multiclust_extended_normalize(A.iloc[i].to_numpy())
+        q = multiclust_extended_normalize(B.iloc[i].to_numpy())
+        js_list.append(float(jensenshannon(p + 1e-12, q + 1e-12, base=2.0)))
+    out["js_final_given_prefix"] = js_list
+
+    # Add weights: how common the prefix is (within each dataset)
+    wD = long_d.groupby("prefix_str")["w"].sum() if not long_d.empty else pd.Series(dtype=float)
+    wT = long_t.groupby("prefix_str")["w"].sum() if not long_t.empty else pd.Series(dtype=float)
+    out["w_disc"] = out["prefix_str"].map(wD).fillna(0.0)
+    out["w_test"] = out["prefix_str"].map(wT).fillna(0.0)
+    out["w_min"] = np.minimum(out["w_disc"], out["w_test"])
+
+    # Sort by (common prefixes) then by biggest JS shift in final mapping
+    out = out.sort_values(["w_min", "js_final_given_prefix"], ascending=[False, False]).reset_index(drop=True)
+
+    # Global summary metric: weighted average JS over prefixes (weights = w_min)
+    w = out["w_min"].to_numpy()
+    if w.sum() > 0:
+        global_js = float(np.sum(out["js_final_given_prefix"].to_numpy() * w) / w.sum())
+    else:
+        global_js = float(out["js_final_given_prefix"].mean())
+
+    metrics = {
+        "num_prefixes_union": len(out),
+        "weighted_js_final_given_prefix": global_js,
+        "final_labels": cols,
+    }
+    return out, metrics
+
+
+@_with_notebook_context
+def multiclust_extended_plot_top_final_mapping_shifts(final_cmp, top_n=20):
+    """Process multiclust extended plot top final mapping shifts."""
+    d = final_cmp.head(top_n).copy()
+    plt.figure(figsize=(11, max(4, 0.35 * len(d))))
+    y = np.arange(len(d))[::-1]
+    plt.barh(y, d["js_final_given_prefix"].iloc[::-1].to_numpy())
+    plt.yticks(y, d["prefix_str"].iloc[::-1].to_list(), fontsize=9)
+    plt.xlabel("JS distance between P(final | prefix) in test vs discovery")
+    plt.title("Prefixes with biggest changes in final mapping")
+    plt.tight_layout()
+    plt.show()
+
+
+@_with_notebook_context
+def multiclust_extended_stream_presence_and_topk(df_disc, df_test, stream_col="stream", n_col="n", topk=30):
+    """Process multiclust extended stream presence and topk."""
+    A = set(df_disc[stream_col].dropna().astype(str))
+    B = set(df_test[stream_col].dropna().astype(str))
+
+    presence = {
+        "unique_streams_disc": len(A),
+        "unique_streams_test": len(B),
+        "stream_jaccard_presence": len(A & B) / max(1, len(A | B)),
+        "coverage_disc_in_test": len(A & B) / max(1, len(A)),
+        "coverage_test_in_disc": len(A & B) / max(1, len(B)),
+    }
+
+    pD = df_disc.groupby(stream_col)[n_col].sum().sort_values(ascending=False)
+    pT = df_test.groupby(stream_col)[n_col].sum().sort_values(ascending=False)
+    pD = pD / pD.sum()
+    pT = pT / pT.sum()
+
+    topD = set(pD.index[: min(topk, len(pD))].astype(str))
+    topT = set(pT.index[: min(topk, len(pT))].astype(str))
+
+    presence[f"top{topk}_jaccard_by_rank"] = len(topD & topT) / max(1, len(topD | topT))
+    presence["top_disc_only"] = sorted(list(topD - topT))[:10]
+    presence["top_test_only"] = sorted(list(topT - topD))[:10]
+    return presence, pD, pT
+
+
+@_with_notebook_context
+def multiclust_extended_sankey_from_streams(df, stream_col="stream", n_col="n", max_edges=200):
+    """
+    Build a Sankey graph from full streams.
+    Nodes are stage-specific label tokens: f"{domain}={label}".
+    Edges connect consecutive tokens. We prune to max_edges by weight.
+    """
+    if not _HAS_PLOTLY:
+        raise RuntimeError("Plotly not installed; cannot draw sankey.")
+
+    edge_w = {}
+    for _, row in df.iterrows():
+        w = float(row.get(n_col, 1.0))
+        path = multiclust_extended_parse_stream(row[stream_col])
+        toks = [f"{d}={l}" for d, l in path]
+        for a, b in zip(toks[:-1], toks[1:]):
+            edge_w[(a, b)] = edge_w.get((a, b), 0.0) + w
+
+    # prune
+    edges = sorted(edge_w.items(), key=lambda x: -x[1])[:max_edges]
+    nodes = {}
+    def nid(x):
+        if x not in nodes:
+            nodes[x] = len(nodes)
+        return nodes[x]
+
+    src, tgt, val = [], [], []
+    for (a, b), w in edges:
+        src.append(nid(a))
+        tgt.append(nid(b))
+        val.append(w)
+
+    labels = [None] * len(nodes)
+    for k, i in nodes.items():
+        labels[i] = k
+
+    fig = go.Figure(data=[go.Sankey(
+        node=dict(label=labels, pad=12, thickness=12),
+        link=dict(source=src, target=tgt, value=val),
+    )])
+    return fig
+
+
+@_with_notebook_context
+def multiclust_extended_full_structure_report(stream_summary, stream_summary_test, stream_col="stream", n_col="n", topk=30, final_domain="final"):
+    # Presence + top-k overlap
+    """Process multiclust extended full structure report."""
+    presence, pD, pT = multiclust_extended_stream_presence_and_topk(stream_summary, stream_summary_test, stream_col, n_col, topk=topk)
+
+    # Prefix-tree structural differences
+    prefix_report = multiclust_extended_compare_prefix_structure(stream_summary, stream_summary_test, stream_col, n_col)
+
+    # Full mapping to final
+    final_cmp, final_metrics = multiclust_extended_compare_final_mapping(stream_summary, stream_summary_test, stream_col, n_col, final_domain)
+
+    return {
+        "presence_metrics": presence,
+        "p_stream_disc": pD,
+        "p_stream_test": pT,
+        "prefix_report": prefix_report,
+        "final_mapping_compare": final_cmp,
+        "final_mapping_metrics": final_metrics,
+    }
+
+
+@_with_notebook_context
+def multiclust_extended_all_streams_table(stream_summary, stream_summary_test, stream_col="stream", n_col="n"):
+    # Aggregate in case there are duplicate stream rows
+    """Process multiclust extended all streams table."""
+    disc = (stream_summary
+            .groupby(stream_col, dropna=False)[n_col]
+            .sum()
+            .rename("n_disc")
+            .to_frame())
+
+    test = (stream_summary_test
+            .groupby(stream_col, dropna=False)[n_col]
+            .sum()
+            .rename("n_test")
+            .to_frame())
+
+    # Outer join gives union of streams
+    tbl = disc.join(test, how="outer").fillna(0)
+
+    # Add proportions within each dataset
+    N_disc = tbl["n_disc"].sum()
+    N_test = tbl["n_test"].sum()
+
+    tbl["p_disc"] = tbl["n_disc"] / N_disc if N_disc > 0 else np.nan
+    tbl["p_test"] = tbl["n_test"] / N_test if N_test > 0 else np.nan
+
+    # Helpful comparisons
+    tbl["delta_p"] = tbl["p_test"] - tbl["p_disc"]
+    tbl["abs_delta_p"] = tbl["delta_p"].abs()
+    tbl["log2_fc"] = np.log2((tbl["p_test"] + 1e-12) / (tbl["p_disc"] + 1e-12))
+
+    # Make stream a real column, sort by biggest shift
+    tbl = tbl.reset_index().rename(columns={stream_col: "stream"})
+    tbl = tbl.sort_values("abs_delta_p", ascending=False).reset_index(drop=True)
+
+    return tbl
+
+
+# -----------------------------------------------------------------------------
+# prospect analysis helpers
+# Implementations are preserved from the original notebook cells.
+# -----------------------------------------------------------------------------
+
+@_with_notebook_context
+def prospect_print_remaining_after_full_missing_modality_removal(df, df_name, meta, modalities, subject_id_column="src_subject_id"):
+    """Process prospect print remaining after full missing modality removal."""
+    modality_to_cols = {
+        modality: [
+            col for col in meta.loc[meta["Modality"] == modality, "ElementName"]
+            if col in df.columns
+        ]
+        for modality in modalities
+    }
+
+    full_missing_mask = pd.Series(False, index=df.index)
+    for cols in modality_to_cols.values():
+        if cols:
+            full_missing_mask |= df[cols].isna().all(axis=1)
+
+    print(
+        f"{df_name}: {(~full_missing_mask).sum()} participants remain "
+        f"after removing participants with >=1 fully missing modality "
+        f"({full_missing_mask.sum()} removed)."
+    )
+
+
+@_with_notebook_context
+def prospect_truthy_profile_value(value):
+    """Process prospect truthy profile value."""
+    return str(value).strip().strip('"\'').upper() in {"TRUE", "1", "YES", "Y"}
+
+
+@_with_notebook_context
+def prospect_parse_profile_exports(profile_path):
+    """Process prospect parse profile exports."""
+    exports = {}
+    if profile_path is None or not profile_path.exists():
+        return exports
+    for line in profile_path.read_text().splitlines():
+        line = line.strip()
+        if not line.startswith("export ") or "=" not in line:
+            continue
+        key, value = line[len("export "):].split("=", 1)
+        value = value.strip()
+        # Keep literal defaults such as ${VAR:-0} as-is; simple quoted values are enough for the flag check.
+        exports[key.strip()] = value.strip('"\'')
+    return exports
+
+
+@_with_notebook_context
+def prospect_infer_notebook_profile():
+    """Process prospect infer notebook profile."""
+    notebook_dir = Path.cwd().name
+    profile_candidates = []
+    if notebook_dir == "clinical_paper":
+        profile_candidates.append("clinical_paper")
+    elif notebook_dir == "multiclust_extended":
+        profile_candidates.append("multiclust_extended")
+    elif notebook_dir == "prospect":
+        profile_candidates.append("prospect")
+    elif notebook_dir == "schizbull_legacy":
+        profile_candidates.append("schizbull_legacy")
+    profile_candidates.append(os.environ.get("RUN_PROFILE", ""))
+    for candidate in profile_candidates:
+        if candidate:
+            return candidate
+    return None
+
+
+@_with_notebook_context
+def prospect_find_repo_root(start):
+    """Process prospect find repo root."""
+    start = Path(start).resolve()
+    for parent in [start] + list(start.parents):
+        if (parent / "run_profiles").is_dir() and (parent / "full_pipeline.py").exists():
+            return parent
+    return None
+
+
+@_with_notebook_context
+def prospect_profile_enabled_for_sensitivity(repo_root, profile_name):
+    """Process prospect profile enabled for sensitivity."""
+    if not profile_name or repo_root is None:
+        return None, None
+    profile_path = repo_root / "run_profiles" / f"{profile_name}.sh"
+    exports = prospect_parse_profile_exports(profile_path)
+    value = exports.get("DO_CLUSTER_VALIDATION_SENSITIVITY", "FALSE")
+    return prospect_truthy_profile_value(value), profile_path
+
+
+@_with_notebook_context
+def prospect_display_if_available(obj):
+    """Process prospect display if available."""
+    if "display" in globals():
+        display(obj)
+    else:
+        print(obj)
+
+
+@_with_notebook_context
+def prospect_get_nested(dct, path, default=np.nan):
+    """Process prospect get nested."""
+    cur = dct
+    for key in path:
+        if not isinstance(cur, dict) or key not in cur:
+            return default
+        cur = cur[key]
+    return cur
+
+
+@_with_notebook_context
+def prospect_flatten_sensitivity_results(results):
+    """Process prospect flatten sensitivity results."""
+    rows = []
+    for solution, payload in results.get("solutions", {}).items():
+        rows.append({
+            "solution": solution,
+            "kind": payload.get("kind"),
+            "observed_k": prospect_get_nested(payload, ["observed_quality", "k"]),
+            "observed_n": prospect_get_nested(payload, ["observed_quality", "n"]),
+            "observed_n_features": prospect_get_nested(payload, ["observed_quality", "n_features"]),
+            "observed_composite": prospect_get_nested(payload, ["observed_quality", "composite"]),
+            "observed_silhouette": prospect_get_nested(payload, ["observed_quality", "silhouette"]),
+            "observed_calinski_harabasz": prospect_get_nested(payload, ["observed_quality", "calinski_harabasz"]),
+            "observed_davies_bouldin": prospect_get_nested(payload, ["observed_quality", "davies_bouldin"]),
+            "k1_composite": prospect_get_nested(payload, ["uni_cluster_baseline", "quality", "composite"]),
+            "pc1_variance_explained": prospect_get_nested(payload, ["pc1_median_split", "pc1_variance_explained"]),
+            "pc1_median_composite": prospect_get_nested(payload, ["pc1_median_split", "quality", "composite"]),
+            "pc1_median_ari_with_observed": prospect_get_nested(payload, ["pc1_median_split", "ari_with_observed_labels"]),
+            "pc1_median_stability_ari": prospect_get_nested(payload, ["pc1_median_split", "bootstrap_stability", "mean_ari"]),
+            "pc1_median_stability_sd_ari": prospect_get_nested(payload, ["pc1_median_split", "bootstrap_stability", "sd_ari"]),
+            "dip_available": prospect_get_nested(payload, ["dip_test_pc1", "available"], default=False),
+            "dip_statistic_pc1": prospect_get_nested(payload, ["dip_test_pc1", "dip"]),
+            "dip_p_value_pc1": prospect_get_nested(payload, ["dip_test_pc1", "p_value"]),
+            "gap_selected_k_tibshirani": prospect_get_nested(payload, ["gap_statistic", "selected_k_tibshirani_rule"]),
+            "gap_selected_k_max_gap": prospect_get_nested(payload, ["gap_statistic", "selected_k_max_gap"]),
+            "sigclust_cluster_index": prospect_get_nested(payload, ["sigclust_approx", "observed_cluster_index"]),
+            "sigclust_p_value": prospect_get_nested(payload, ["sigclust_approx", "p_value"]),
+            "sigclust_null_mean_cluster_index": prospect_get_nested(payload, ["sigclust_approx", "null_mean_cluster_index"]),
+            "gaussian_null_p_quality": prospect_get_nested(payload, ["covariance_matched_gaussian_null", "p_quality_ge_observed_recluster"]),
+            "gaussian_null_p_stability": prospect_get_nested(payload, ["covariance_matched_gaussian_null", "p_stability_ge_observed_recluster"]),
+            "observed_recluster_stability_ari": prospect_get_nested(payload, ["covariance_matched_gaussian_null", "observed_recluster_stability", "mean_ari"]),
+            "gaussian_null_mean_stability_ari": prospect_get_nested(payload, ["covariance_matched_gaussian_null", "null_stability_mean_ari"]),
+            "gaussian_null_mean_quality": prospect_get_nested(payload, ["covariance_matched_gaussian_null", "null_quality_mean"]),
+        })
+    return pd.DataFrame(rows)
+
+
+@_with_notebook_context
+def prospect_categorical_like(series, max_discrete_levels=6):
+    """Process prospect categorical like."""
+    observed = series.dropna()
+    return (not pd.api.types.is_numeric_dtype(series)) or observed.nunique() <= max_discrete_levels
+
+
+@_with_notebook_context
+def prospect_eta_squared_by_category(values, categories):
+    """Process prospect eta squared by category."""
+    frame = pd.DataFrame({"factor": pd.to_numeric(values, errors="coerce"), "category": categories.astype("string").fillna("<missing>")}).dropna(subset=["factor"])
+    if frame.empty or frame["category"].nunique() < 2:
+        return np.nan
+    grand_mean = frame["factor"].mean()
+    total_ss = ((frame["factor"] - grand_mean) ** 2).sum()
+    if not np.isfinite(total_ss) or total_ss <= 0:
+        return np.nan
+    grouped = frame.groupby("category", observed=False)["factor"]
+    between_ss = sum(len(group) * (group.mean() - grand_mean) ** 2 for _, group in grouped)
+    return float(between_ss / total_ss)
+
+
+@_with_notebook_context
+def prospect_safe_spearman(values, factor_scores):
+    """Process prospect safe spearman."""
+    numeric = pd.to_numeric(values, errors="coerce")
+    aligned = pd.DataFrame({"value": numeric, "factor": factor_scores}).dropna()
+    if aligned["value"].nunique() < 2 or aligned["factor"].nunique() < 2:
+        return np.nan
+    return float(aligned["value"].corr(aligned["factor"], method="spearman"))
+
+
+@_with_notebook_context
+def prospect_infer_cluster_association_feature_type(series, max_discrete_levels=6):
+    """Process prospect infer cluster association feature type."""
+    observed = series.dropna()
+    if observed.empty:
+        return "empty"
+    if pd.api.types.is_numeric_dtype(series) and observed.nunique() > max_discrete_levels:
+        return "continuous"
+    return "categorical"
+
+
+@_with_notebook_context
+def prospect_eta_squared_for_feature(values, clusters):
+    """Process prospect eta squared for feature."""
+    frame = pd.DataFrame({"value": pd.to_numeric(values, errors="coerce"), "cluster": pd.Series(clusters).astype(str)}).dropna()
+    if frame.empty or frame["cluster"].nunique() < 2 or frame["value"].nunique() < 2:
+        return np.nan
+    grand_mean = frame["value"].mean()
+    total_ss = ((frame["value"] - grand_mean) ** 2).sum()
+    if not np.isfinite(total_ss) or total_ss <= 0:
+        return np.nan
+    between_ss = sum(len(g) * (g["value"].mean() - grand_mean) ** 2 for _, g in frame.groupby("cluster", observed=False))
+    return float(between_ss / total_ss)
+
+
+@_with_notebook_context
+def prospect_categorical_cluster_score(values, clusters):
+    """Process prospect categorical cluster score."""
+    frame = pd.DataFrame({"value": pd.Series(values).astype("string").fillna("<missing>"), "cluster": pd.Series(clusters).astype(str)}).dropna()
+    if frame.empty or frame["cluster"].nunique() < 2 or frame["value"].nunique() < 2:
+        return np.nan
+    table = pd.crosstab(frame["cluster"], frame["value"])
+    try:
+        chi2, _, _, _ = chi2_contingency(table)
+    except Exception:
+        return np.nan
+    n = table.to_numpy().sum()
+    denom = n * max(1, min(table.shape) - 1)
+    return float(np.sqrt(chi2 / denom)) if denom > 0 else np.nan
+
+
+@_with_notebook_context
+def prospect_add_metadata_and_clusters_individual_labels(final_metrics, data_full, mod_num):
+    """
+    Merge cluster labels into full metadata DataFrame using src_subject_id
+    from the actual training data stored in fold_metrics['data'].
+    This ensures correct alignment even when not all train_ids were clustered.
+    """
+    clusters = pd.Series(final_metrics['individual_labels'][mod_num])
+
+    # Get the first modality’s dataframe — all have the same subject order
+    modality_dfs = final_metrics.get('data', {})
+    if not modality_dfs:
+        raise ValueError("final_metrics['data'] is empty; cannot extract subject IDs.")
+
+    # Use the src_subject_id column from the first available modality
+    first_modality = list(modality_dfs.keys())[0]
+    subj_ids = modality_dfs[first_modality]['src_subject_id'].reset_index(drop=True)
+
+    # Sanity check: should match cluster array length
+    if len(subj_ids) != len(clusters):
+        print(f"⚠️ Mismatch: {len(subj_ids)} subject IDs vs {len(clusters)} cluster labels.")
+        min_len = min(len(subj_ids), len(clusters))
+        subj_ids = subj_ids.iloc[:min_len]
+        clusters = clusters.iloc[:min_len]
+        print(f"Trimmed both to {min_len} entries to align.")
+
+    # Build cluster mapping dataframe
+    cluster_df = pd.DataFrame({
+        'src_subject_id': subj_ids,
+        'Cluster': clusters
+    })
+
+    # Merge back into full metadata
+    merged = pd.merge(data_full, cluster_df, on='src_subject_id', how='left')
+
+    print(f"✅ Merged clusters for {merged['Cluster'].notna().sum()} subjects (out of {len(merged)} total).")
+    return merged
+
+
+@_with_notebook_context
+def prospect_chi_square_comparison_individual_labels(df, group_col, label_col, title_prefix):
+    """
+    Perform chi-square test and plot grouped bar chart.
+    """
+    # Drop missing values
+    df = df.dropna(subset=[group_col, label_col])
+
+    # Make a copy for plotting / stats so we can safely relabel
+    df_plot = df.copy()
+
+    # Rename 'HC' -> 'CC' only for phenotype (for plotting and stats)
+    if label_col == 'phenotype':
+        df_plot[label_col] = df_plot[label_col].replace({'HC': 'CC'})
+
+    # 1. Summarize counts
+    summary_df = (
+        df_plot.groupby([group_col, label_col])
+        .size()
+        .reset_index(name='n')
+    )
+
+    # 2. Chi-square test
+    tbl = pd.crosstab(df_plot[group_col], df_plot[label_col])
+    chi2, pval, dof, expected = chi2_contingency(tbl)
+    pval = round(pval, 3)
+
+    # 3. Grouped bar chart
+    plt.figure(figsize=(8, 6))
+    sns.barplot(
+        data=summary_df,
+        x=group_col,
+        y='n',
+        hue=label_col,
+        dodge=True
+    )
+    plt.title(f"{title_prefix}\n(Chi-square p = {pval})")
+    plt.xlabel("Cluster")
+    plt.ylabel("Count")
+    sns.despine()
+    plt.tight_layout()
+    plt.show()
+
+
+@_with_notebook_context
+def prospect_add_metadata_and_clusters_final_labels(final_metrics, data_full):
+    """
+    Merge cluster labels into full metadata DataFrame using src_subject_id
+    from the actual training data stored in fold_metrics['data'].
+    This ensures correct alignment even when not all train_ids were clustered.
+    """
+    clusters = pd.Series(final_metrics['final_labels'])
+
+    # Get the first modality’s dataframe — all have the same subject order
+    modality_dfs = final_metrics.get('data', {})
+    if not modality_dfs:
+        raise ValueError("final_metrics['data'] is empty; cannot extract subject IDs.")
+
+    # Use the src_subject_id column from the first available modality
+    first_modality = list(modality_dfs.keys())[0]
+    subj_ids = modality_dfs[first_modality]['src_subject_id'].reset_index(drop=True)
+
+    # Sanity check: should match cluster array length
+    if len(subj_ids) != len(clusters):
+        print(f"⚠️ Mismatch: {len(subj_ids)} subject IDs vs {len(clusters)} cluster labels.")
+        min_len = min(len(subj_ids), len(clusters))
+        subj_ids = subj_ids.iloc[:min_len]
+        clusters = clusters.iloc[:min_len]
+        print(f"Trimmed both to {min_len} entries to align.")
+
+    # Build cluster mapping dataframe
+    cluster_df = pd.DataFrame({
+        'src_subject_id': subj_ids,
+        'Cluster': clusters
+    })
+
+    # Merge back into full metadata
+    merged = pd.merge(data_full, cluster_df, on='src_subject_id', how='left')
+
+    print(f"✅ Merged clusters for {merged['Cluster'].notna().sum()} subjects (out of {len(merged)} total).")
+    return merged
+
+
+@_with_notebook_context
+def prospect_chi_square_comparison_final_labels(df, group_col, label_col, title_prefix, save_path):
+    """
+    Perform chi-square test and plot grouped bar chart.
+    """
+    # Drop missing values
+    df = df.dropna(subset=[group_col, label_col])
+
+    # Make a copy for plotting / stats so we can safely relabel
+    df_plot = df.copy()
+
+    # Rename 'HC' -> 'CC' only for phenotype (for plotting and stats)
+    if label_col == 'phenotype':
+        df_plot[label_col] = df_plot[label_col].replace({'HC': 'CC'})
+
+    # 1. Summarize counts
+    summary_df = (
+        df_plot.groupby([group_col, label_col])
+        .size()
+        .reset_index(name='n')
+    )
+
+    # 2. Chi-square test
+    tbl = pd.crosstab(df_plot[group_col], df_plot[label_col])
+    chi2, pval, dof, expected = chi2_contingency(tbl)
+    pval = round(pval, 3)
+
+    # 3. Grouped bar chart
+    plt.figure(figsize=(8, 6))
+    sns.barplot(
+        data=summary_df,
+        x=group_col,
+        y='n',
+        hue=label_col,
+        dodge=True
+    )
+    plt.title(f"{title_prefix}\n(Chi-square p = {pval})")
+    plt.xlabel("Cluster")
+    plt.ylabel("Count")
+    sns.despine()
+    plt.tight_layout()
+    plt.savefig(save_path, dpi=1000)
+    plt.show()
+
+    # 4. Cluster summary (including CHR percentage if relevant)
+    cluster_summary = (
+        df_plot.groupby(group_col)
+        .agg(
+            Size=(group_col, 'size'),
+            CHR_percentage=(
+                label_col,
+                lambda x: (x.eq('CHR').sum() / len(x)) * 100
+                if 'CHR' in x.values else None
+            )
+        )
+        .reset_index()
+        .sort_values(group_col)
+    )
+    print(f"\nCluster summary for {title_prefix}")
+    print(cluster_summary)
+    print("\n" + "-"*60)
+
+
+@_with_notebook_context
+def prospect_alluvial_sankey_force_high_top(
+    labels_by_modality: dict,
+    final_labels,
+    stage_order: list,
+    final_name="final",
+    high_token="high_severity",
+    low_token="low_severity",
+    final_order="auto",
+    arrangement="snap",
+    high_y=0.10,
+    low_y=0.90,
+    other_y=0.50,
+    node_pad=22,
+    node_thickness=18,
+    width=1400,
+    height=650,
+    title="All modalities -> final (alluvial Sankey)",
+):
+    """Process prospect alluvial sankey force high top."""
+    return alluvial_sankey_general(
+        labels_by_modality=labels_by_modality,
+        final_labels=final_labels,
+        stage_order=stage_order,
+        final_name=final_name,
+        high_token=high_token,
+        low_token=low_token,
+        final_order=final_order,
+        arrangement=arrangement,
+        high_y=high_y,
+        low_y=low_y,
+        other_y=other_y,
+        node_pad=node_pad,
+        node_thickness=node_thickness,
+        width=width,
+        height=height,
+        title=title,
+    )
+
+
+@_with_notebook_context
+def prospect_summarize_streams(df_paths, stage_order, top_k=20, sample_ids=10):
+    """Process prospect summarize streams."""
+    group_cols = stage_order + ["final"]
+    total = len(df_paths)
+
+    g = (df_paths
+         .groupby(group_cols, dropna=False)
+         .agg(
+             n=("src_subject_id", "size"),
+             example_ids=("src_subject_id", lambda x: list(x.head(sample_ids))),
+         )
+         .reset_index()
+        )
+
+    g["pct"] = (g["n"] / total * 100).round(2)
+
+    # A readable "stream label"
+    def make_stream_label(row):
+        parts = [f"{c}={row[c]}" for c in stage_order] + [f"final={row['final']}"]
+        return " → ".join(parts)
+
+    g["stream"] = g.apply(make_stream_label, axis=1)
+
+    g = g.sort_values("n", ascending=False).head(top_k)
+
+    # Reorder columns nicely
+    cols = ["n", "pct", "stream", "example_ids"] + stage_order + ["final"]
+    return g[cols]
+
+
+@_with_notebook_context
+def prospect_summarize_streams_clinical(df_paths, stage_order, top_k=20, sample_ids=10):
+    """Process prospect summarize streams clinical."""
+    group_cols = stage_order
+    total = len(df_paths)
+
+    g = (df_paths
+         .groupby(group_cols, dropna=False)
+         .agg(
+             n=("src_subject_id", "size"),
+             example_ids=("src_subject_id", lambda x: list(x.head(sample_ids))),
+         )
+         .reset_index()
+        )
+
+    g["pct"] = (g["n"] / total * 100).round(2)
+
+    # A readable "stream label"
+    def make_stream_label(row):
+        parts = [f"{c}={row[c]}" for c in stage_order]
+        return " → ".join(parts)
+
+    g["stream"] = g.apply(make_stream_label, axis=1)
+
+    g = g.sort_values("n", ascending=False).head(top_k)
+
+    # Reorder columns nicely
+    cols = ["n", "pct", "stream", "example_ids"] + stage_order
+    return g[cols]
+
+
+@_with_notebook_context
+def prospect_finite_values(frame, col):
+    """Process prospect finite values."""
+    vals = pd.to_numeric(frame[col], errors="coerce").to_numpy(dtype=float)
+    return vals[np.isfinite(vals)]
+
+
+@_with_notebook_context
+def prospect_hist_if_finite(frame, col, bins=30, xlabel=None, title=None):
+    """Process prospect hist if finite."""
+    if col not in frame.columns:
+        print(f"Skipping {col}: column is missing.")
+        return
+    vals = prospect_finite_values(frame, col)
+    if vals.size == 0:
+        print(f"Skipping {col}: no finite values to plot.")
+        return
+    plt.figure()
+    plt.hist(vals, bins=bins)
+    plt.xlabel(xlabel or col)
+    plt.ylabel("Count")
+    plt.title(title or f"{col} distribution (unlabeled hold-out)")
+    plt.show()
+
+
+@_with_notebook_context
+def prospect_plot_pred_modality(df, name):
+    """
+    Plots confidence/uncertainty diagnostics for a single modality DataFrame.
+    Expected columns (any subset is ok): p_*, confidence, entropy, margin.
+    """
+    if df is None:
+        print(f"{name}: no predictions to plot.")
+        return
+    df = df.copy()
+
+    prob_cols = [c for c in df.columns if str(c).startswith("p_")]
+    if prob_cols:
+        p = df[prob_cols].apply(pd.to_numeric, errors="coerce").to_numpy(dtype=float)
+        if p.shape[1] >= 2:
+            p_sorted = np.sort(p, axis=1)
+            df["confidence"] = np.nanmax(p, axis=1)
+            df["margin"] = p_sorted[:, -1] - p_sorted[:, -2]
+            p_clip = np.clip(p, 1e-12, 1.0)
+            df["entropy"] = -np.nansum(p_clip * np.log(p_clip), axis=1)
+
+    def finite_values(col):
+        vals = pd.to_numeric(df[col], errors="coerce").to_numpy(dtype=float)
+        return vals[np.isfinite(vals)]
+
+    def hist_if_exists(col, bins=30, xlabel=None):
+        if col not in df.columns:
+            print(f"{name}: skipping {col}; column is missing.")
+            return
+        vals = finite_values(col)
+        if vals.size == 0:
+            print(f"{name}: skipping {col}; no finite values to plot.")
+            return
+        plt.figure()
+        plt.hist(vals, bins=bins)
+        plt.xlabel(xlabel or col)
+        plt.ylabel("Count")
+        plt.title(f"{name}: {col} distribution (unlabeled hold-out)")
+        plt.show()
+
+    # 1) Histograms
+    if "p_1" in df.columns:
+        hist_if_exists("p_1", xlabel="Predicted probability p(class=1)")
+    elif prob_cols:
+        hist_if_exists(prob_cols[0], xlabel=f"Predicted probability {prob_cols[0]}")
+    hist_if_exists("confidence", xlabel="Confidence = max class probability")
+    hist_if_exists("entropy", xlabel="Entropy (higher = more uncertain)")
+    hist_if_exists("margin", xlabel="Probability margin: best - second-best (lower = more uncertain)")
+
+    # 2) Scatter plots that are often informative
+    if ("confidence" in df.columns) and ("entropy" in df.columns):
+        x = pd.to_numeric(df["confidence"], errors="coerce").to_numpy(dtype=float)
+        y = pd.to_numeric(df["entropy"], errors="coerce").to_numpy(dtype=float)
+        ok = np.isfinite(x) & np.isfinite(y)
+        if ok.any():
+            plt.figure()
+            plt.scatter(x[ok], y[ok], s=10)
+            plt.xlabel("Confidence")
+            plt.ylabel("Entropy")
+            plt.title(f"{name}: confidence vs entropy")
+            plt.show()
+        else:
+            print(f"{name}: skipping confidence vs entropy; no finite paired values.")
+
+    if ("confidence" in df.columns) and ("margin" in df.columns):
+        x = pd.to_numeric(df["confidence"], errors="coerce").to_numpy(dtype=float)
+        y = pd.to_numeric(df["margin"], errors="coerce").to_numpy(dtype=float)
+        ok = np.isfinite(x) & np.isfinite(y)
+        if ok.any():
+            plt.figure()
+            plt.scatter(x[ok], y[ok], s=10)
+            plt.xlabel("Confidence")
+            plt.ylabel("Margin")
+            plt.title(f"{name}: confidence vs margin")
+            plt.show()
+        else:
+            print(f"{name}: skipping confidence vs margin; no finite paired values.")
+
+    # 3) Print most uncertain cases.
+    print(f"=== {name}: most uncertain examples ===")
+
+    if "confidence" in df.columns:
+        print("Lowest confidence:")
+        display(df.sort_values("confidence", ascending=True).head(10))
+
+    if "margin" in df.columns:
+        print("Lowest margin:")
+        display(df.sort_values("margin", ascending=True).head(10))
+
+    if "entropy" in df.columns:
+        print("Highest entropy:")
+        display(df.sort_values("entropy", ascending=False).head(10))
+
+
+@_with_notebook_context
+def prospect_safe_name(value):
+    """Process prospect safe name."""
+    return re.sub(r"[^A-Za-z0-9_.-]+", "_", str(value)).strip("_") or "unnamed"
+
+
+@_with_notebook_context
+def prospect_ordered_cluster_labels(labels):
+    """Process prospect ordered cluster labels."""
+    labels = pd.Series(labels).astype(str)
+    return sorted(labels.unique(), key=lambda x: int(x) if str(x).isdigit() else str(x))
+
+
+@_with_notebook_context
+def prospect_prepare_feature_table(df, clusters, subject_id_column="src_subject_id"):
+    """Process prospect prepare feature table."""
+    features = df.drop(columns=[subject_id_column], errors="ignore").reset_index(drop=True).copy()
+    clusters = pd.Series(clusters).astype(str).reset_index(drop=True)
+    if len(features) != len(clusters):
+        raise ValueError(f"feature rows ({len(features)}) != labels ({len(clusters)}).")
+
+    keep_cols = []
+    for col in features.columns:
+        s = features[col].replace([np.inf, -np.inf], np.nan)
+        if s.dropna().nunique() > 1:
+            keep_cols.append(col)
+    return features[keep_cols], clusters
+
+
+@_with_notebook_context
+def prospect_infer_ranked_feature_type(series, max_categorical_levels=8):
+    """Classify columns for plotting/testing. Binary and low-cardinality numeric columns are categorical."""
+    s = pd.Series(series).replace([np.inf, -np.inf], np.nan)
+    observed = s.dropna()
+    if observed.empty or observed.nunique() <= 1:
+        return "constant"
+
+    numeric = pd.to_numeric(s, errors="coerce")
+    numeric_fraction = numeric.notna().mean()
+    numeric_unique = numeric.dropna().nunique()
+
+    if numeric_fraction >= 0.90 and numeric_unique > max_categorical_levels:
+        return "continuous"
+    return "categorical"
+
+
+@_with_notebook_context
+def prospect_continuous_score(series, clusters, cluster_order):
+    """Process prospect continuous score."""
+    values = pd.to_numeric(series, errors="coerce").replace([np.inf, -np.inf], np.nan)
+    groups = [values[clusters == cl].dropna().to_numpy(dtype=float) for cl in cluster_order]
+    groups = [g for g in groups if len(g) >= 2]
+    if len(groups) < 2 or sum(np.nanvar(g) > 0 for g in groups) == 0:
+        return 0.0, np.nan, np.nan
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        stat, p_value = f_oneway(*groups)
+
+    if not np.isfinite(stat) or not np.isfinite(p_value):
+        return 0.0, np.nan, np.nan
+    score = -np.log10(max(float(p_value), np.finfo(float).tiny))
+    return score, float(stat), float(p_value)
+
+
+@_with_notebook_context
+def prospect_categorical_values(series, max_levels=10):
+    """Process prospect categorical values."""
+    s = pd.Series(series).replace([np.inf, -np.inf], np.nan)
+    values = s.astype("object").where(s.notna(), "Missing").astype(str)
+    counts = values.value_counts(dropna=False)
+    if len(counts) > max_levels:
+        top_levels = set(counts.head(max_levels - 1).index)
+        values = values.where(values.isin(top_levels), "Other")
+    return values
+
+
+@_with_notebook_context
+def prospect_categorical_score(series, clusters, cluster_order):
+    """Process prospect categorical score."""
+    values = prospect_categorical_values(series)
+    table = pd.crosstab(clusters, values).reindex(cluster_order, fill_value=0)
+    table = table.loc[:, table.sum(axis=0) > 0]
+    if table.shape[0] < 2 or table.shape[1] < 2:
+        return 0.0, np.nan, np.nan
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        chi2, p_value, _, _ = chi2_contingency(table.to_numpy())
+
+    if not np.isfinite(chi2) or not np.isfinite(p_value):
+        return 0.0, np.nan, np.nan
+    score = -np.log10(max(float(p_value), np.finfo(float).tiny))
+    return score, float(chi2), float(p_value)
+
+
+@_with_notebook_context
+def prospect_rank_features_by_cluster(features, clusters, top_k=10):
+    """Process prospect rank features by cluster."""
+    cluster_order = prospect_ordered_cluster_labels(clusters)
+    rows = []
+    for col in features.columns:
+        kind = prospect_infer_ranked_feature_type(features[col])
+        if kind == "continuous":
+            score, stat, p_value = prospect_continuous_score(features[col], clusters, cluster_order)
+            test = "ANOVA"
+        elif kind == "categorical":
+            score, stat, p_value = prospect_categorical_score(features[col], clusters, cluster_order)
+            test = "chi-square"
+        else:
+            continue
+
+        rows.append({
+            "feature": col,
+            "kind": kind,
+            "test": test,
+            "score": score,
+            "statistic": stat,
+            "p_value": p_value,
+        })
+
+    ranked = pd.DataFrame(rows)
+    if ranked.empty:
+        return ranked
+    return ranked.sort_values(["score", "statistic"], ascending=False).head(top_k).reset_index(drop=True)
+
+
+@_with_notebook_context
+def prospect_plot_continuous_feature(ax, plot_df, feature, cluster_order, palette):
+    """Process prospect plot continuous feature."""
+    plot_df = plot_df.copy()
+    plot_df[feature] = pd.to_numeric(plot_df[feature], errors="coerce").replace([np.inf, -np.inf], np.nan)
+    sns.boxplot(
+        data=plot_df,
+        x="cluster",
+        y=feature,
+        order=cluster_order,
+        hue="cluster",
+        hue_order=cluster_order,
+        palette=palette,
+        legend=False,
+        ax=ax,
+    )
+    sns.stripplot(
+        data=plot_df,
+        x="cluster",
+        y=feature,
+        order=cluster_order,
+        color="black",
+        size=3,
+        jitter=True,
+        alpha=0.45,
+        ax=ax,
+    )
+    ax.set_ylabel("")
+
+
+@_with_notebook_context
+def prospect_plot_categorical_feature(ax, plot_df, feature, cluster_order):
+    """Process prospect plot categorical feature."""
+    cats = prospect_categorical_values(plot_df[feature])
+    table = pd.crosstab(plot_df["cluster"], cats, normalize="index").reindex(cluster_order).fillna(0.0)
+    table = table.reindex(sorted(table.columns, key=str), axis=1)
+
+    bottom = np.zeros(len(table), dtype=float)
+    colors = sns.color_palette("tab20", n_colors=max(1, table.shape[1]))
+    x = np.arange(len(table.index))
+    for i, category in enumerate(table.columns):
+        heights = table[category].to_numpy(dtype=float)
+        ax.bar(x, heights, bottom=bottom, label=str(category), color=colors[i], edgecolor="white", linewidth=0.4)
+        bottom += heights
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(table.index)
+    ax.set_ylim(0, 1.02)
+    ax.set_ylabel("Proportion")
+    if table.shape[1] <= 8:
+        ax.legend(title="", fontsize=7, loc="upper left", bbox_to_anchor=(1.02, 1.0), frameon=False)
+    else:
+        ax.legend_.remove() if ax.legend_ is not None else None
+
+
+@_with_notebook_context
+def prospect_plot_ranked_feature_grid(features, clusters, ranked, modality, output_dir):
+    """Process prospect plot ranked feature grid."""
+    cluster_order = prospect_ordered_cluster_labels(clusters)
+    palette = sns.color_palette(n_colors=len(cluster_order))
+    top_features = ranked["feature"].tolist()
+    max_cols = 3
+    n_rows = int(np.ceil(len(top_features) / max_cols))
+    fig, axes = plt.subplots(n_rows, max_cols, figsize=(max_cols * 6, n_rows * 4.8), squeeze=False)
+    axes = axes.flatten()
+
+    plot_df = features.copy()
+    plot_df["cluster"] = pd.Series(clusters).astype(str).to_numpy()
+
+    for j, feat in enumerate(top_features):
+        ax = axes[j]
+        kind = ranked.loc[ranked["feature"] == feat, "kind"].iloc[0]
+        score = ranked.loc[ranked["feature"] == feat, "score"].iloc[0]
+        test = ranked.loc[ranked["feature"] == feat, "test"].iloc[0]
+        if kind == "continuous":
+            prospect_plot_continuous_feature(ax, plot_df, feat, cluster_order, palette)
+        else:
+            prospect_plot_categorical_feature(ax, plot_df, feat, cluster_order)
+        ax.set_title(f"{feat}\n{test}, -log10(p)={score:.2f}", fontsize=11)
+        ax.set_xlabel("Cluster")
+        ax.tick_params(axis="both", labelsize=10)
+
+    for j in range(len(top_features), len(axes)):
+        axes[j].set_visible(False)
+
+    fig.suptitle(
+        f"{modality} - Top features by domain-predicted cluster",
+        y=1.02,
+        fontsize=16,
+    )
+    fig.tight_layout()
+    fig.savefig(os.path.join(output_dir, f"test_{prospect_safe_name(modality)}_domain_top_features.png"), dpi=300, bbox_inches="tight")
+    plt.show()
+
+
+@_with_notebook_context
+def prospect_labels_for_modality(modality, mod_index):
+    """Process prospect labels for modality."""
+    if "labels_test_by_modality" in globals() and labels_test_by_modality.get(modality) is not None:
+        return np.asarray(labels_test_by_modality[modality])
+    if "labels_test_modalities" in globals() and mod_index < len(labels_test_modalities):
+        labels = labels_test_modalities[mod_index]
+        return None if labels is None else np.asarray(labels)
+    return None
+
+
+@_with_notebook_context
+def prospect_labels_for_modality_local(modality, mod_index):
+    """Process prospect labels for modality local."""
+    if "labels_test_by_modality" in globals() and labels_test_by_modality.get(modality) is not None:
+        return np.asarray(labels_test_by_modality[modality])
+    if "labels_test_modalities" in globals() and mod_index < len(labels_test_modalities):
+        labels = labels_test_modalities[mod_index]
+        return None if labels is None else np.asarray(labels)
+    return None
+
+
+@_with_notebook_context
+def prospect_add_metadata_and_clusters_validation_individual_labels(dict_final, data_full, mod_num):
+    """
+    Merge cluster labels into full metadata DataFrame using src_subject_id
+    from the actual training data stored in fold_metrics['data'].
+    This ensures correct alignment even when not all train_ids were clustered.
+    """
+    clusters = pd.Series(labels_test_modalities[mod_num])
+
+    # Get the first modality’s dataframe — all have the same subject order
+    modality_dfs = dict_final
+    if not modality_dfs:
+        raise ValueError("dict_final is empty; cannot extract subject IDs.")
+
+    # Use the src_subject_id column from the first available modality
+    first_modality = list(modality_dfs.keys())[0]
+    subj_ids = modality_dfs[first_modality]['src_subject_id'].reset_index(drop=True)
+
+    # Sanity check: should match cluster array length
+    if len(subj_ids) != len(clusters):
+        print(f"⚠️ Mismatch: {len(subj_ids)} subject IDs vs {len(clusters)} cluster labels.")
+        min_len = min(len(subj_ids), len(clusters))
+        subj_ids = subj_ids.iloc[:min_len]
+        clusters = clusters.iloc[:min_len]
+        print(f"Trimmed both to {min_len} entries to align.")
+
+    # Build cluster mapping dataframe
+    cluster_df = pd.DataFrame({
+        'src_subject_id': subj_ids,
+        'Cluster': clusters
+    })
+
+    # Merge back into full metadata
+    merged = pd.merge(data_full, cluster_df, on='src_subject_id', how='left')
+
+    print(f"✅ Merged clusters for {merged['Cluster'].notna().sum()} subjects (out of {len(merged)} total).")
+    return merged
+
+
+@_with_notebook_context
+def prospect_chi_square_comparison_validation_individual_labels(df, group_col, label_col, title_prefix):
+    """
+    Perform chi-square test and plot grouped bar chart.
+    """
+    # Drop missing values
+    df = df.dropna(subset=[group_col, label_col])
+
+    # Make a copy for plotting / stats so we can safely relabel
+    df_plot = df.copy()
+
+    # Rename 'HC' -> 'CC' only for phenotype (for plotting and stats)
+    if label_col == 'phenotype':
+        df_plot[label_col] = df_plot[label_col].replace({'HC': 'CC'})
+
+    # 1. Summarize counts
+    summary_df = (
+        df_plot.groupby([group_col, label_col])
+        .size()
+        .reset_index(name='n')
+    )
+
+    # 2. Chi-square test
+    tbl = pd.crosstab(df_plot[group_col], df_plot[label_col])
+    chi2, pval, dof, expected = chi2_contingency(tbl)
+    pval = round(pval, 3)
+
+    # 3. Grouped bar chart
+    plt.figure(figsize=(8, 6))
+    sns.barplot(
+        data=summary_df,
+        x=group_col,
+        y='n',
+        hue=label_col,
+        dodge=True
+    )
+    plt.title(f"{title_prefix}\n(Chi-square p = {pval})")
+    plt.xlabel("Cluster")
+    plt.ylabel("Count")
+    sns.despine()
+    plt.tight_layout()
+    plt.show()
+
+
+@_with_notebook_context
+def prospect_parse_stream(stream_str):
+    """
+    Parse stream like:
+      "Metabolic_Risk=low -> Blood_markers=high -> ... -> final=1"
+    into ordered list of (domain, label).
+    """
+    if pd.isna(stream_str):
+        return []
+    parts = [p.strip() for p in ARROW_PAT.split(str(stream_str).strip()) if p.strip()]
+    out = []
+    for p in parts:
+        if "=" in p:
+            dom, lab = p.split("=", 1)
+            out.append((dom.strip(), lab.strip()))
+        else:
+            out.append((p.strip(), "<NA>"))
+    return out
+
+
+@_with_notebook_context
+def prospect_infer_stage_order(df, stream_col="stream"):
+    """
+    Infer stage order from the first non-null stream.
+    Assumes all streams follow the same domain order.
+    """
+    s = df[stream_col].dropna().astype(str)
+    if s.empty:
+        raise ValueError("No streams found to infer stage order.")
+    path = prospect_parse_stream(s.iloc[0])
+    return [d for d, _ in path]
+
+
+@_with_notebook_context
+def prospect_normalize(v, eps=1e-12):
+    """Process prospect normalize."""
+    v = np.asarray(v, dtype=float)
+    s = v.sum()
+    if s <= 0:
+        return np.ones_like(v) / max(1, len(v))
+    return v / (s + eps)
+
+
+@_with_notebook_context
+def prospect_build_prefix_next(df, stream_col="stream", n_col="n"):
+    """
+    Returns:
+      prefix_next: dict[prefix_tuple_of_(domain,label)] -> dict[next_token_(domain,label)|<END>] -> weight
+      prefix_mass: dict[prefix] -> total weight passing through prefix
+    Where prefix is a tuple of (domain,label) tokens, e.g.:
+      prefix = (("Metabolic_Risk","low"), ("Blood_markers","high"))
+    and next token is the next (domain,label) or "<END>".
+    """
+    prefix_next = {}
+    prefix_mass = {}
+
+    for _, row in df.iterrows():
+        w = float(row.get(n_col, 1.0))
+        path = prospect_parse_stream(row[stream_col])
+        if not path:
+            continue
+
+        # For each prefix (including empty prefix), record what comes next
+        for i in range(len(path)):
+            prefix = tuple(path[:i])  # empty prefix for i=0
+            nxt = path[i]             # next token
+            prefix_mass[prefix] = prefix_mass.get(prefix, 0.0) + w
+            d = prefix_next.setdefault(prefix, {})
+            d[nxt] = d.get(nxt, 0.0) + w
+
+        # terminal transition from full path to END
+        full_prefix = tuple(path)
+        prefix_mass[full_prefix] = prefix_mass.get(full_prefix, 0.0) + w
+        d = prefix_next.setdefault(full_prefix, {})
+        d["<END>"] = d.get("<END>", 0.0) + w
+
+    return prefix_next, prefix_mass
+
+
+@_with_notebook_context
+def prospect_compare_prefix_structure(df_disc, df_test, stream_col="stream", n_col="n", eps=1e-12):
+    """
+    For each prefix, compare the conditional distribution over next tokens:
+        P_disc(next | prefix)  vs  P_test(next | prefix)
+
+    Returns DataFrame with:
+      - prefix_str
+      - depth
+      - js_next (Jensen–Shannon distance on next-step distributions)
+      - mass_disc / mass_test (how much data passes through prefix; useful for weighting but not "size-equality")
+      - top_next_disc / top_next_test (most likely next step)
+      - support_next_overlap (Jaccard on next-token supports)
+    """
+    pn_d, pm_d = prospect_build_prefix_next(df_disc, stream_col, n_col)
+    pn_t, pm_t = prospect_build_prefix_next(df_test, stream_col, n_col)
+
+    prefixes = set(pn_d.keys()) | set(pn_t.keys())
+
+    rows = []
+    for pref in prefixes:
+        nd = pn_d.get(pref, {})
+        nt = pn_t.get(pref, {})
+
+        keys = set(nd.keys()) | set(nt.keys())
+        # Align next-token vectors
+        vd = np.array([nd.get(k, 0.0) for k in keys], dtype=float)
+        vt = np.array([nt.get(k, 0.0) for k in keys], dtype=float)
+
+        pd_ = prospect_normalize(vd, eps=eps)
+        pt_ = prospect_normalize(vt, eps=eps)
+
+        js = float(jensenshannon(pd_ + eps, pt_ + eps, base=2.0))
+
+        # Next-token support overlap (presence/absence, structure)
+        supp_d = {k for k, v in nd.items() if v > 0}
+        supp_t = {k for k, v in nt.items() if v > 0}
+        supp_j = len(supp_d & supp_t) / max(1, len(supp_d | supp_t))
+
+        # Most likely next token in each
+        top_d = max(nd.items(), key=lambda x: x[1])[0] if nd else None
+        top_t = max(nt.items(), key=lambda x: x[1])[0] if nt else None
+
+        def tok_str(tok):
+            if tok == "<END>":
+                return "<END>"
+            if tok is None:
+                return "<NONE>"
+            return f"{tok[0]}={tok[1]}"
+
+        prefix_str = " → ".join([f"{d}={l}" for d, l in pref]) if pref else "<START>"
+        rows.append({
+            "prefix_str": prefix_str,
+            "depth": len(pref),
+            "js_next": js,
+            "mass_disc": pm_d.get(pref, 0.0),
+            "mass_test": pm_t.get(pref, 0.0),
+            "top_next_disc": tok_str(top_d),
+            "top_next_test": tok_str(top_t),
+            "support_next_jaccard": supp_j,
+            "prefix_exists_in_disc": pref in pn_d,
+            "prefix_exists_in_test": pref in pn_t,
+        })
+
+    out = pd.DataFrame(rows)
+    # A useful default sorting: prioritize structurally-different AND commonly-used prefixes
+    out["mass_min"] = np.minimum(out["mass_disc"], out["mass_test"])
+    out = out.sort_values(["mass_min", "js_next"], ascending=[False, False]).reset_index(drop=True)
+    return out
+
+
+@_with_notebook_context
+def prospect_plot_top_prefix_differences(prefix_report, top_n=20, min_depth=1):
+    """
+    Barh plot of top prefixes by JS(next) after filtering.
+    """
+    d = prefix_report[prefix_report["depth"] >= min_depth].copy()
+    d = d.sort_values("js_next", ascending=False).head(top_n)
+
+    plt.figure(figsize=(11, max(4, 0.35 * len(d))))
+    y = np.arange(len(d))[::-1]
+    plt.barh(y, d["js_next"].iloc[::-1].to_numpy())
+    plt.yticks(y, d["prefix_str"].iloc[::-1].to_list(), fontsize=9)
+    plt.xlabel("Jensen–Shannon distance of P(next | prefix)")
+    plt.title("Most structurally different prefixes (next-step rule)")
+    plt.tight_layout()
+    plt.show()
+
+
+@_with_notebook_context
+def prospect_final_mapping_table(df, stream_col="stream", n_col="n", final_domain="final"):
+    """
+    Builds a table over modality-prefixes (everything up to but excluding final)
+    with P(final=label | prefix) computed within each dataset.
+
+    Returns DataFrame:
+      prefix_str, final_label, weight
+    and also a pivoted table of P(final=...) by prefix.
+    """
+    rows = []
+    for _, row in df.iterrows():
+        w = float(row.get(n_col, 1.0))
+        path = prospect_parse_stream(row[stream_col])
+        if not path:
+            continue
+
+        # split into prefix (before final) and final token
+        final_tokens = [t for t in path if t[0] == final_domain]
+        if not final_tokens:
+            # If final isn't explicitly present, skip
+            continue
+        final_tok = final_tokens[-1]  # in case of duplicates, take last
+        final_label = final_tok[1]
+
+        # prefix = all tokens before the final token position (first occurrence)
+        # more robust: take all tokens except the final-domain token(s)
+        prefix = tuple([t for t in path if t[0] != final_domain])
+
+        prefix_str = " → ".join([f"{d}={l}" for d, l in prefix]) if prefix else "<NO_MODALITIES>"
+        rows.append({"prefix_str": prefix_str, "final_label": final_label, "w": w})
+
+    long = pd.DataFrame(rows)
+    if long.empty:
+        return long, pd.DataFrame()
+
+    # Compute conditional probabilities P(final_label | prefix)
+    grp = long.groupby(["prefix_str", "final_label"], dropna=False)["w"].sum().reset_index()
+    totals = grp.groupby("prefix_str")["w"].sum().reset_index().rename(columns={"w": "w_total"})
+    grp = grp.merge(totals, on="prefix_str", how="left")
+    grp["p_final_given_prefix"] = grp["w"] / grp["w_total"]
+
+    pivot = grp.pivot_table(index="prefix_str", columns="final_label", values="p_final_given_prefix", fill_value=0.0)
+    return grp, pivot
+
+
+@_with_notebook_context
+def prospect_compare_final_mapping(df_disc, df_test, stream_col="stream", n_col="n", final_domain="final"):
+    """
+    Compare P(final | modalities) between discovery and test.
+    Returns a table with per-prefix deltas per final label plus summary metrics.
+    """
+    long_d, piv_d = prospect_final_mapping_table(df_disc, stream_col, n_col, final_domain)
+    long_t, piv_t = prospect_final_mapping_table(df_test, stream_col, n_col, final_domain)
+
+    if piv_d.empty or piv_t.empty:
+        return pd.DataFrame(), {"note": "No final mapping found (missing final tokens?)"}
+
+    # align
+    idx = sorted(set(piv_d.index) | set(piv_t.index))
+    cols = sorted(set(piv_d.columns) | set(piv_t.columns))
+    A = piv_d.reindex(index=idx, columns=cols).fillna(0.0)
+    B = piv_t.reindex(index=idx, columns=cols).fillna(0.0)
+
+    # Delta per final label
+    delta = (B - A)
+    out = delta.copy()
+    out.columns = [f"delta_final={c}" for c in out.columns]
+    out.insert(0, "prefix_str", out.index)
+
+    # A per-prefix summary: JS distance between final distributions for that prefix
+    js_list = []
+    for i in range(A.shape[0]):
+        p = prospect_normalize(A.iloc[i].to_numpy())
+        q = prospect_normalize(B.iloc[i].to_numpy())
+        js_list.append(float(jensenshannon(p + 1e-12, q + 1e-12, base=2.0)))
+    out["js_final_given_prefix"] = js_list
+
+    # Add weights: how common the prefix is (within each dataset)
+    wD = long_d.groupby("prefix_str")["w"].sum() if not long_d.empty else pd.Series(dtype=float)
+    wT = long_t.groupby("prefix_str")["w"].sum() if not long_t.empty else pd.Series(dtype=float)
+    out["w_disc"] = out["prefix_str"].map(wD).fillna(0.0)
+    out["w_test"] = out["prefix_str"].map(wT).fillna(0.0)
+    out["w_min"] = np.minimum(out["w_disc"], out["w_test"])
+
+    # Sort by (common prefixes) then by biggest JS shift in final mapping
+    out = out.sort_values(["w_min", "js_final_given_prefix"], ascending=[False, False]).reset_index(drop=True)
+
+    # Global summary metric: weighted average JS over prefixes (weights = w_min)
+    w = out["w_min"].to_numpy()
+    if w.sum() > 0:
+        global_js = float(np.sum(out["js_final_given_prefix"].to_numpy() * w) / w.sum())
+    else:
+        global_js = float(out["js_final_given_prefix"].mean())
+
+    metrics = {
+        "num_prefixes_union": len(out),
+        "weighted_js_final_given_prefix": global_js,
+        "final_labels": cols,
+    }
+    return out, metrics
+
+
+@_with_notebook_context
+def prospect_plot_top_final_mapping_shifts(final_cmp, top_n=20):
+    """Process prospect plot top final mapping shifts."""
+    d = final_cmp.head(top_n).copy()
+    plt.figure(figsize=(11, max(4, 0.35 * len(d))))
+    y = np.arange(len(d))[::-1]
+    plt.barh(y, d["js_final_given_prefix"].iloc[::-1].to_numpy())
+    plt.yticks(y, d["prefix_str"].iloc[::-1].to_list(), fontsize=9)
+    plt.xlabel("JS distance between P(final | prefix) in test vs discovery")
+    plt.title("Prefixes with biggest changes in final mapping")
+    plt.tight_layout()
+    plt.show()
+
+
+@_with_notebook_context
+def prospect_stream_presence_and_topk(df_disc, df_test, stream_col="stream", n_col="n", topk=30):
+    """Process prospect stream presence and topk."""
+    A = set(df_disc[stream_col].dropna().astype(str))
+    B = set(df_test[stream_col].dropna().astype(str))
+
+    presence = {
+        "unique_streams_disc": len(A),
+        "unique_streams_test": len(B),
+        "stream_jaccard_presence": len(A & B) / max(1, len(A | B)),
+        "coverage_disc_in_test": len(A & B) / max(1, len(A)),
+        "coverage_test_in_disc": len(A & B) / max(1, len(B)),
+    }
+
+    pD = df_disc.groupby(stream_col)[n_col].sum().sort_values(ascending=False)
+    pT = df_test.groupby(stream_col)[n_col].sum().sort_values(ascending=False)
+    pD = pD / pD.sum()
+    pT = pT / pT.sum()
+
+    topD = set(pD.index[: min(topk, len(pD))].astype(str))
+    topT = set(pT.index[: min(topk, len(pT))].astype(str))
+
+    presence[f"top{topk}_jaccard_by_rank"] = len(topD & topT) / max(1, len(topD | topT))
+    presence["top_disc_only"] = sorted(list(topD - topT))[:10]
+    presence["top_test_only"] = sorted(list(topT - topD))[:10]
+    return presence, pD, pT
+
+
+@_with_notebook_context
+def prospect_sankey_from_streams(df, stream_col="stream", n_col="n", max_edges=200):
+    """
+    Build a Sankey graph from full streams.
+    Nodes are stage-specific label tokens: f"{domain}={label}".
+    Edges connect consecutive tokens. We prune to max_edges by weight.
+    """
+    if not _HAS_PLOTLY:
+        raise RuntimeError("Plotly not installed; cannot draw sankey.")
+
+    edge_w = {}
+    for _, row in df.iterrows():
+        w = float(row.get(n_col, 1.0))
+        path = prospect_parse_stream(row[stream_col])
+        toks = [f"{d}={l}" for d, l in path]
+        for a, b in zip(toks[:-1], toks[1:]):
+            edge_w[(a, b)] = edge_w.get((a, b), 0.0) + w
+
+    # prune
+    edges = sorted(edge_w.items(), key=lambda x: -x[1])[:max_edges]
+    nodes = {}
+    def nid(x):
+        if x not in nodes:
+            nodes[x] = len(nodes)
+        return nodes[x]
+
+    src, tgt, val = [], [], []
+    for (a, b), w in edges:
+        src.append(nid(a))
+        tgt.append(nid(b))
+        val.append(w)
+
+    labels = [None] * len(nodes)
+    for k, i in nodes.items():
+        labels[i] = k
+
+    fig = go.Figure(data=[go.Sankey(
+        node=dict(label=labels, pad=12, thickness=12),
+        link=dict(source=src, target=tgt, value=val),
+    )])
+    return fig
+
+
+@_with_notebook_context
+def prospect_full_structure_report(stream_summary, stream_summary_test, stream_col="stream", n_col="n", topk=30, final_domain="final"):
+    # Presence + top-k overlap
+    """Process prospect full structure report."""
+    presence, pD, pT = prospect_stream_presence_and_topk(stream_summary, stream_summary_test, stream_col, n_col, topk=topk)
+
+    # Prefix-tree structural differences
+    prefix_report = prospect_compare_prefix_structure(stream_summary, stream_summary_test, stream_col, n_col)
+
+    # Full mapping to final
+    final_cmp, final_metrics = prospect_compare_final_mapping(stream_summary, stream_summary_test, stream_col, n_col, final_domain)
+
+    return {
+        "presence_metrics": presence,
+        "p_stream_disc": pD,
+        "p_stream_test": pT,
+        "prefix_report": prefix_report,
+        "final_mapping_compare": final_cmp,
+        "final_mapping_metrics": final_metrics,
+    }
+
+
+@_with_notebook_context
+def prospect_all_streams_table(stream_summary, stream_summary_test, stream_col="stream", n_col="n"):
+    # Aggregate in case there are duplicate stream rows
+    """Process prospect all streams table."""
+    disc = (stream_summary
+            .groupby(stream_col, dropna=False)[n_col]
+            .sum()
+            .rename("n_disc")
+            .to_frame())
+
+    test = (stream_summary_test
+            .groupby(stream_col, dropna=False)[n_col]
+            .sum()
+            .rename("n_test")
+            .to_frame())
+
+    # Outer join gives union of streams
+    tbl = disc.join(test, how="outer").fillna(0)
+
+    # Add proportions within each dataset
+    N_disc = tbl["n_disc"].sum()
+    N_test = tbl["n_test"].sum()
+
+    tbl["p_disc"] = tbl["n_disc"] / N_disc if N_disc > 0 else np.nan
+    tbl["p_test"] = tbl["n_test"] / N_test if N_test > 0 else np.nan
+
+    # Helpful comparisons
+    tbl["delta_p"] = tbl["p_test"] - tbl["p_disc"]
+    tbl["abs_delta_p"] = tbl["delta_p"].abs()
+    tbl["log2_fc"] = np.log2((tbl["p_test"] + 1e-12) / (tbl["p_disc"] + 1e-12))
+
+    # Make stream a real column, sort by biggest shift
+    tbl = tbl.reset_index().rename(columns={stream_col: "stream"})
+    tbl = tbl.sort_values("abs_delta_p", ascending=False).reset_index(drop=True)
+
+    return tbl

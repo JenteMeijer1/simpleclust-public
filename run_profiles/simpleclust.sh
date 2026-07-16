@@ -1,3 +1,4 @@
+# Purpose: Run the simpleclust task.
 # SchizBull paper profile using the singleclust single-view grid-search runner.
 # The executable stage flow is documented in docs/singleclust_pipeline_overview.md.
 # This profile contains paper-specific configuration only; orchestration stays in run.sh.

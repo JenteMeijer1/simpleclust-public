@@ -50,6 +50,7 @@ _MAX_32BIT_SEED = 2 ** 32 - 1
 
 
 def _derive_seed(*parts, base=0):
+    """Handle derive seed."""
     payload = "|".join(str(part) for part in (base,) + tuple(parts)).encode("utf-8")
     seed = int.from_bytes(hashlib.blake2b(payload, digest_size=8).digest(), "little")
     return seed % _MAX_32BIT_SEED
@@ -65,6 +66,7 @@ class Solution:
 
 
 def _json_default(obj):
+    """Handle json default."""
     if isinstance(obj, (np.integer,)):
         return int(obj)
     if isinstance(obj, (np.floating,)):
@@ -75,15 +77,18 @@ def _json_default(obj):
 
 
 def _safe_mkdir(path: str) -> None:
+    """Handle safe mkdir."""
     os.makedirs(path, exist_ok=True)
 
 
 def _load_metrics(path: str) -> dict:
+    """Load metrics."""
     with open(path, "rb") as f:
         return _pickle_module.load(f)
 
 
 def _as_numeric_matrix(df: pd.DataFrame, subject_id_column: str) -> Tuple[np.ndarray, List[str]]:
+    """Handle as numeric matrix."""
     xdf = df.drop(columns=[subject_id_column], errors="ignore").copy()
     xdf = xdf.select_dtypes(include=[np.number])
     cols = list(xdf.columns)
@@ -97,10 +102,12 @@ def _as_numeric_matrix(df: pd.DataFrame, subject_id_column: str) -> Tuple[np.nda
 
 
 def _standardize(X: np.ndarray) -> np.ndarray:
+    """Handle standardize."""
     return StandardScaler().fit_transform(np.asarray(X, dtype=float))
 
 
 def _pca_reduce(X: np.ndarray, max_components: int = 20) -> Tuple[np.ndarray, np.ndarray]:
+    """Handle pca reduce."""
     Xz = _standardize(X)
     n_comp = max(1, min(max_components, Xz.shape[0] - 1, Xz.shape[1]))
     pca = PCA(n_components=n_comp, random_state=42)
@@ -122,16 +129,19 @@ def _projection_matrix(n_features: int, n_random: int, seed: int) -> Tuple[np.nd
 
 
 def _valid_labels(labels: np.ndarray) -> np.ndarray:
+    """Handle valid labels."""
     labels = np.asarray(labels).reshape(-1)
     return labels >= 0
 
 
 def _cluster_count(labels: np.ndarray) -> int:
+    """Handle cluster count."""
     v = labels[_valid_labels(labels)]
     return int(len(np.unique(v))) if v.size else 0
 
 
 def _quality_metrics(X: np.ndarray, labels: np.ndarray) -> Dict[str, float]:
+    """Handle quality metrics."""
     labels = np.asarray(labels).reshape(-1)
     valid = _valid_labels(labels)
     Xv = X[valid]
@@ -179,6 +189,7 @@ def _quality_metrics(X: np.ndarray, labels: np.ndarray) -> Dict[str, float]:
 
 
 def _uni_cluster_baseline(X: np.ndarray) -> Dict[str, object]:
+    """Handle uni cluster baseline."""
     labels = np.zeros(X.shape[0], dtype=int)
     quality = _quality_metrics(_standardize(X), labels)
     return {
@@ -189,6 +200,7 @@ def _uni_cluster_baseline(X: np.ndarray) -> Dict[str, object]:
 
 
 def _hierarchical_labels(X: np.ndarray, k: int, method: str = "average") -> np.ndarray:
+    """Handle hierarchical labels."""
     if k <= 1:
         return np.zeros(X.shape[0], dtype=int)
     if X.shape[0] <= k:
@@ -198,6 +210,7 @@ def _hierarchical_labels(X: np.ndarray, k: int, method: str = "average") -> np.n
 
 
 def _kmeans_within_dispersion(X: np.ndarray, k: int, seed: int) -> float:
+    """Handle kmeans within dispersion."""
     if k <= 1:
         center = np.mean(X, axis=0, keepdims=True)
         return float(np.sum((X - center) ** 2))
@@ -207,6 +220,7 @@ def _kmeans_within_dispersion(X: np.ndarray, k: int, seed: int) -> float:
 
 
 def _resolve_n_jobs(n_jobs: int) -> int:
+    """Resolve n jobs."""
     if n_jobs is None or int(n_jobs) == 0:
         return 1
     if int(n_jobs) < 0:
@@ -215,6 +229,7 @@ def _resolve_n_jobs(n_jobs: int) -> int:
 
 
 def _parallel_map(func, tasks: List[tuple], n_jobs: int):
+    """Handle parallel map."""
     workers = min(_resolve_n_jobs(n_jobs), len(tasks)) if tasks else 1
     if workers <= 1 or len(tasks) <= 1:
         return [func(task) for task in tasks]
@@ -223,6 +238,7 @@ def _parallel_map(func, tasks: List[tuple], n_jobs: int):
 
 
 def _rscript_path() -> Optional[str]:
+    """Handle rscript path."""
     return shutil.which("Rscript")
 
 
@@ -233,12 +249,14 @@ def _sample_cov_matched_from_params(
     vecs: np.ndarray,
     seed: int,
 ) -> np.ndarray:
+    """Handle sample cov matched from params."""
     rng = np.random.default_rng(seed)
     z = rng.normal(size=(int(n_rows), vals.size))
     return z @ (vecs * np.sqrt(vals)).T + mu
 
 
 def _gap_reference_worker(task: tuple) -> float:
+    """Handle gap reference worker."""
     shape, mins, maxs, k, seed = task
     rng = np.random.default_rng(seed)
     Xb = rng.uniform(mins, maxs, size=shape)
@@ -246,6 +264,7 @@ def _gap_reference_worker(task: tuple) -> float:
 
 
 def _gaussian_null_worker(task: tuple) -> Dict[str, float]:
+    """Handle gaussian null worker."""
     n_rows, mu, vals, vecs, k, n_bootstrap, seed = task
     Xb = _sample_cov_matched_from_params(n_rows, mu, vals, vecs, seed)
     lb = _hierarchical_labels(Xb, k=int(k))
@@ -271,6 +290,7 @@ def _gap_statistic(
     max_components: int,
     n_jobs: int = 1,
 ) -> Tuple[pd.DataFrame, Dict[str, object]]:
+    """Handle gap statistic."""
     Xr, var_ratio = _pca_reduce(X, max_components=max_components)
     k_max = max(1, min(int(k_max), Xr.shape[0] - 1))
     mins = Xr.min(axis=0)
@@ -309,6 +329,7 @@ def _gap_statistic_r_clusgap(
     seed: int,
     max_components: int,
 ) -> Tuple[pd.DataFrame, Dict[str, object]]:
+    """Handle gap statistic r clusgap."""
     rscript = _rscript_path()
     if rscript is None:
         raise RuntimeError("Rscript is not available; cannot run R cluster::clusGap.")
@@ -379,6 +400,7 @@ def _dip_test_projections(
     seed: int,
     n_jobs: int = 1,
 ) -> Dict[str, object]:
+    """Handle dip test projections."""
     Xr, var_ratio = _pca_reduce(X, max_components=max_components)
     directions, direction_names = _projection_matrix(Xr.shape[1], n_random_projections, seed)
     out = {
@@ -445,6 +467,7 @@ def _dip_test_projections(
 
 
 def _dip_projection_null_worker(task: tuple) -> float:
+    """Handle dip projection null worker."""
     n_rows, mu, vals, vecs, directions, seed = task
     try:
         import diptest  # type: ignore
@@ -457,6 +480,7 @@ def _dip_projection_null_worker(task: tuple) -> float:
 
 
 def _regularized_covariance(X: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Handle regularized covariance."""
     Xz = _standardize(X)
     mu = np.mean(Xz, axis=0)
     cov = np.cov(Xz, rowvar=False)
@@ -474,6 +498,7 @@ def _sigclust_python_package(
     max_components: int,
     n_jobs: int = 1,
 ) -> Dict[str, object]:
+    """Handle sigclust python package."""
     Xr, var_ratio = _pca_reduce(X, max_components=max_components)
     k = _cluster_count(labels)
     base = {
@@ -547,6 +572,7 @@ def _subsample_stability(
     seed: int,
     frac: float = 0.8,
 ) -> Dict[str, object]:
+    """Handle subsample stability."""
     n = X.shape[0]
     size = max(k + 1, int(round(frac * n)))
     if n_bootstrap < 2 or k <= 1 or n < 4:
@@ -582,6 +608,7 @@ def _gaussian_null_quality_and_stability(
     max_components: int,
     n_jobs: int = 1,
 ) -> Dict[str, object]:
+    """Handle gaussian null quality and stability."""
     k = _cluster_count(labels)
     Xr, var_ratio = _pca_reduce(X, max_components=max_components)
     observed_quality = _quality_metrics(Xr, labels)
@@ -619,6 +646,7 @@ def _projection_median_split_stability(
     seed: int,
     frac: float = 0.8,
 ) -> Dict[str, object]:
+    """Handle projection median split stability."""
     n = Xr.shape[0]
     size = max(3, int(round(frac * n)))
     if n_bootstrap < 2 or n < 4:
@@ -665,6 +693,7 @@ def _projection_median_split(
     n_random_projections: int,
     seed: int,
 ) -> Dict[str, object]:
+    """Handle projection median split."""
     Xr, var_ratio = _pca_reduce(X, max_components=max_components)
     directions, direction_names = _projection_matrix(Xr.shape[1], n_random_projections, seed)
     rows = []
@@ -714,6 +743,7 @@ def _projection_median_split(
 
 
 def _plot_pc1_pc2(solution: Solution, out_dir: str, max_components: int) -> None:
+    """Plot pc1 pc2."""
     Xr, var_ratio = _pca_reduce(solution.X, max_components=max(2, max_components))
     if Xr.shape[1] < 2:
         return
@@ -732,6 +762,7 @@ def _plot_pc1_pc2(solution: Solution, out_dir: str, max_components: int) -> None
 
 
 def _plot_gap(gap_df: pd.DataFrame, name: str, out_dir: str) -> None:
+    """Plot gap."""
     fig, ax = plt.subplots(figsize=(6.5, 4.8))
     ax.errorbar(gap_df["k"], gap_df["gap"], yerr=gap_df["gap_se"], marker="o", linewidth=1.5, capsize=3)
     ax.set_xlabel("Number of clusters (k)")
@@ -743,6 +774,7 @@ def _plot_gap(gap_df: pd.DataFrame, name: str, out_dir: str) -> None:
 
 
 def _build_solutions(metrics: dict, modalities: Optional[List[str]], subject_id_column: str) -> List[Solution]:
+    """Build solutions."""
     data = metrics.get("data")
     indiv = metrics.get("individual_labels")
     if indiv is None:
@@ -818,6 +850,7 @@ def _build_solutions(metrics: dict, modalities: Optional[List[str]], subject_id_
 
 
 def run(args: argparse.Namespace) -> None:
+    """Handle run."""
     _safe_mkdir(args.output_dir)
     plot_dir = os.path.join(args.output_dir, "plots")
     _safe_mkdir(plot_dir)
@@ -975,6 +1008,7 @@ def run(args: argparse.Namespace) -> None:
 
 
 def parse_args(argv: Optional[Iterable[str]] = None) -> argparse.Namespace:
+    """Parse args."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--metrics_pkl", required=True, help="Path to final_metrics.pkl or fold metrics.pkl.")
     parser.add_argument("--output_dir", required=True, help="Directory for validation outputs.")

@@ -1,3 +1,5 @@
+"""Define consistent colours and plotting styles for all analyses."""
+
 # theme.py
 from __future__ import annotations
 
@@ -5,7 +7,7 @@ from matplotlib.colors import LinearSegmentedColormap
 
 # ── Neutral colour for community controls (CC) ───────────────────────────────
 # A dark slate-blue: clearly a baseline/reference group, distinct from clusters.
-CC_COLOR = "#4A6080"
+CC_COLOR = "#A6A6A6"
 
 # ── Categorical palette ───────────────────────────────────────────────────────
 # Six colours derived from Paul Tol's colourblind-safe "muted" scheme,
@@ -72,6 +74,7 @@ THEME = {
 
 
 def apply_matplotlib() -> None:
+    """Apply matplotlib."""
     import matplotlib as mpl
     try:
         mpl.colormaps.register(cmap4, name=CMAP4_NAME)
@@ -99,6 +102,7 @@ def apply_matplotlib() -> None:
 
 
 def apply_seaborn() -> None:
+    """Apply seaborn."""
     import seaborn as sns
     sns.set_theme(
         style="white",
@@ -111,6 +115,7 @@ def apply_seaborn() -> None:
 
 
 def apply_plotly() -> None:
+    """Apply plotly."""
     import plotly.io as pio
     import plotly.graph_objects as go
 
@@ -145,9 +150,11 @@ def apply_plotly() -> None:
 
 
 def apply_altair() -> None:
+    """Apply altair."""
     import altair as alt
 
     def _theme():
+        """Handle theme."""
         return {
             "config": {
                 "background": THEME["bg"],
@@ -174,6 +181,7 @@ def apply_altair() -> None:
 
 
 def apply_all() -> None:
+    """Apply all."""
     try:
         apply_matplotlib()
     except Exception:
@@ -202,6 +210,7 @@ def apply_all() -> None:
 
 
 def themed_heatmap(*args, **kwargs):
+    """Handle themed heatmap."""
     import seaborn as sns
     kwargs.setdefault("cmap", THEME.get("sequential_cmap_mpl_obj", THEME["sequential_cmap_mpl"]))
     kwargs.setdefault("cbar_kws", {})
@@ -209,6 +218,7 @@ def themed_heatmap(*args, **kwargs):
 
 
 def themed_clustermap(*args, **kwargs):
+    """Handle themed clustermap."""
     import seaborn as sns
     kwargs.setdefault("cmap", THEME.get("sequential_cmap_mpl_obj", THEME["sequential_cmap_mpl"]))
     return sns.clustermap(*args, **kwargs)
@@ -249,6 +259,7 @@ THEME_LEGACY = {
 
 
 def apply_matplotlib_legacy() -> None:
+    """Apply matplotlib legacy."""
     import matplotlib as mpl
     try:
         mpl.colormaps.register(cmap4, name=CMAP4_NAME)
@@ -276,6 +287,7 @@ def apply_matplotlib_legacy() -> None:
 
 
 def apply_seaborn_legacy() -> None:
+    """Apply seaborn legacy."""
     import seaborn as sns
     sns.set_theme(
         style="white",
@@ -288,6 +300,7 @@ def apply_seaborn_legacy() -> None:
 
 
 def apply_plotly_legacy() -> None:
+    """Apply plotly legacy."""
     import plotly.io as pio
     import plotly.graph_objects as go
 
@@ -322,9 +335,11 @@ def apply_plotly_legacy() -> None:
 
 
 def apply_altair_legacy() -> None:
+    """Apply altair legacy."""
     import altair as alt
 
     def _theme():
+        """Handle theme."""
         return {
             "config": {
                 "background": THEME_LEGACY["bg"],

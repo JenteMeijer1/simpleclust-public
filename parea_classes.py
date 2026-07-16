@@ -1,3 +1,5 @@
+"""Define clustering estimators used by the Parea ensemble workflow."""
+
 def enforce_min_cluster_size(distance_matrix, final_labels, min_size=20):
     """
     Iteratively merge the smallest undersized cluster into its nearest
@@ -72,6 +74,7 @@ class Clusterer(object):
     :func:`Clusterer.execute` function.
     """
     def __init__(self) -> None:
+        """Initialize the object."""
         pass
 
     def execute(self) -> list:
@@ -88,10 +91,12 @@ class NullClusteringPyrea(Clusterer):
     include it without forcing spurious splits.
     """
     def __init__(self, n_clusters: int = 1, **kwargs) -> None:
+        """Initialize the object."""
         super().__init__()
         self.n_clusters = 1  # always 1 for null model
 
     def execute(self, data) -> list:
+        """Handle execute."""
         import numpy as _np
         n = data.shape[0] if hasattr(data, 'shape') else len(data)
         return _np.zeros(n, dtype=int)
@@ -109,7 +114,7 @@ class HierarchicalClusteringPyrea(Clusterer):
                        height=None) -> None:
         """
         Hierarchical clustering that supports both raw-feature inputs and
-        precomputed distance matrices.  
+        precomputed distance matrices.
         - Use Ward **only** with raw observations (not precomputed distances).
         - For precomputed distances, use linkages in {'single','complete','average','weighted','centroid','median'}.
 
@@ -149,6 +154,7 @@ class HierarchicalClusteringPyrea(Clusterer):
             print("Warning: 'ward' linkage is not valid for precomputed distances. Using 'average' instead.")
 
     def execute(self, data) -> list:
+        """Handle execute."""
         super().execute()
 
         # --- Build linkage matrix correctly depending on input type ---
@@ -236,6 +242,7 @@ class SpectralClusteringPyrea(Clusterer):
         self.verbose = verbose
 
     def execute(self, data: list) -> list:
+        """Handle execute."""
         super().execute()
         X = np.asarray(data)
         n = X.shape[0]
@@ -332,16 +339,17 @@ class ModelBasedClusteringPyrea(Clusterer):
         self.precomputed = precomputed
         self.out = out
         self.height = height
-        
+
         # Dynamically filter out invalid kwargs
         valid_params = inspect.signature(GaussianMixture.__init__).parameters
         self.kwargs = {k: v for k, v in kwargs.items() if k in valid_params}
 
     def execute(self, data) -> list:
+        """Handle execute."""
         super().execute()
-        model = GaussianMixture(n_components=self.n_components, 
-                                covariance_type=self.covariance_type, 
-                                random_state=self.random_state, 
+        model = GaussianMixture(n_components=self.n_components,
+                                covariance_type=self.covariance_type,
+                                random_state=self.random_state,
                                 **self.kwargs)  # Now only valid arguments are passed
         return model.fit_predict(data)
 
@@ -350,7 +358,7 @@ class KMeansPyrea(Clusterer):
     def __init__(self, n_clusters=3, init='k-means++', max_iter=300, random_state=None, **kwargs):
         """
         K-Means Clustering.
-        
+
         Parameters:
             - n_clusters: Number of clusters (default=3).
             - init: Initialization method ('k-means++' or 'random').
@@ -369,11 +377,12 @@ class KMeansPyrea(Clusterer):
         self.kwargs = {k: v for k, v in kwargs.items() if k in valid_params}
 
     def execute(self, data) -> list:
+        """Handle execute."""
         super().execute()
-        model = KMeans(n_clusters=self.n_clusters, 
-                       init=self.init, 
-                       max_iter=self.max_iter, 
-                       random_state=self.random_state, 
+        model = KMeans(n_clusters=self.n_clusters,
+                       init=self.init,
+                       max_iter=self.max_iter,
+                       random_state=self.random_state,
                        **self.kwargs)
         return model.fit_predict(data)
 
@@ -382,7 +391,7 @@ class MeanShiftPyrea(Clusterer):
     def __init__(self, bandwidth=None, cluster_all=True, **kwargs):
         """
         Mean-Shift Clustering.
-        
+
         Parameters:
             - bandwidth: Window size for clustering (default=None, automatically estimated).
             - cluster_all: Whether to assign all points to clusters.
@@ -397,9 +406,10 @@ class MeanShiftPyrea(Clusterer):
         self.kwargs = {k: v for k, v in kwargs.items() if k in valid_params}
 
     def execute(self, data) -> list:
+        """Handle execute."""
         super().execute()
-        model = MeanShift(bandwidth=self.bandwidth, 
-                          cluster_all=self.cluster_all, 
+        model = MeanShift(bandwidth=self.bandwidth,
+                          cluster_all=self.cluster_all,
                           **self.kwargs)
         return model.fit_predict(data)
 
@@ -421,18 +431,18 @@ class EnsembleClusteringPyrea(Clusterer):
                  **kwargs):
         """
         Ensemble Clustering using a co-association matrix.
-        
+
         Parameters:
-            - clusterers: A list of Clusterer objects (e.g., HierarchicalClusteringPyrea, 
+            - clusterers: A list of Clusterer objects (e.g., HierarchicalClusteringPyrea,
                           SpectralClusteringPyrea, ModelBasedClusteringPyrea, KMeansPyrea , etc.).
             - n_clusters: Desired number of final clusters.
-            - linkage_method: Linkage method for the final hierarchical clustering 
+            - linkage_method: Linkage method for the final hierarchical clustering
                               (e.g., 'single', 'complete', 'average', 'ward', etc.).
             - method: An unused parameter for compatibility (like other classes).
             - **kwargs: Catch-all for any other arguments that might be passed.
         """
         super().__init__()
-        
+
         self.clusterers = clusterers
         self.n_clusters = n_clusters
         self.precomputed = precomputed
@@ -457,11 +467,13 @@ class EnsembleClusteringPyrea(Clusterer):
 
     @staticmethod
     def _as_bool(value):
+        """Handle as bool."""
         if isinstance(value, str):
             return value.strip().upper() == "TRUE"
         return bool(value)
 
     def _raw_clusterer_for_method(self, method_name, seed):
+        """Handle raw clusterer for method."""
         if method_name == "hierarchical":
             return HierarchicalClusteringPyrea(
                 precomputed=False,
@@ -488,6 +500,7 @@ class EnsembleClusteringPyrea(Clusterer):
         raise ValueError(f"Unknown internal ensemble method: {method_name}")
 
     def _precomputed_clusterer_for_method(self, method_name, seed):
+        """Handle precomputed clusterer for method."""
         if method_name == "hierarchical":
             return HierarchicalClusteringPyrea(
                 precomputed=True,
@@ -503,6 +516,7 @@ class EnsembleClusteringPyrea(Clusterer):
         raise ValueError(f"Unknown precomputed internal ensemble method: {method_name}")
 
     def _update_coassociation(self, numerator, denominator, indices, labels):
+        """Update coassociation."""
         idx = np.asarray(indices, dtype=int)
         lab = np.asarray(labels).ravel()
         if idx.size == 0 or lab.size != idx.size:
@@ -512,6 +526,7 @@ class EnsembleClusteringPyrea(Clusterer):
         denominator[np.ix_(idx, idx)] += 1.0
 
     def _consensus_from_coassociation(self, numerator, denominator):
+        """Handle consensus from coassociation."""
         with np.errstate(divide="ignore", invalid="ignore"):
             co_assoc = np.divide(
                 numerator,
@@ -536,6 +551,7 @@ class EnsembleClusteringPyrea(Clusterer):
             return hierarchy.fcluster(Z, t=self.n_clusters, criterion='maxclust')
 
     def _execute_balanced_raw_ensemble(self, data):
+        """Handle execute balanced raw ensemble."""
         X = np.asarray(data)
         n_samples = X.shape[0]
         n_features = X.shape[1] if X.ndim > 1 else 1
@@ -571,6 +587,7 @@ class EnsembleClusteringPyrea(Clusterer):
         return self._consensus_from_coassociation(numerator, denominator)
 
     def _execute_balanced_precomputed_ensemble(self, data):
+        """Handle execute balanced precomputed ensemble."""
         X = np.asarray(data)
         is_sim = np.allclose(np.diag(X), 1.0, atol=1e-3) and X.min() >= -1e-6 and X.max() <= 1.0 + 1e-6
         if is_sim:
@@ -616,6 +633,7 @@ class EnsembleClusteringPyrea(Clusterer):
         return self._consensus_from_coassociation(numerator, denominator)
 
     def execute(self, data) -> list:
+        """Handle execute."""
         super().execute()
         import warnings
         if self.precomputed == False:
@@ -626,7 +644,7 @@ class EnsembleClusteringPyrea(Clusterer):
             num_samples = len(data)
             num_clusterers = len(self.clusterers)
             all_labels = np.zeros((num_clusterers, num_samples), dtype=int)
-            
+
             for i, clstr in enumerate(self.clusterers):
                 labels = clstr.execute(data)
                 all_labels[i, :] = labels
@@ -637,23 +655,23 @@ class EnsembleClusteringPyrea(Clusterer):
             # Sanitize co_assoc
             if np.any(np.isnan(co_assoc)):
                 co_assoc = np.nan_to_num(co_assoc, nan=0.0)
-            
+
             # 3. Use (1 - co_assoc) as distance, do hierarchical clustering
             dist_matrix = 1.0 - co_assoc
             dist_matrix = np.nan_to_num(dist_matrix, nan=0.0, posinf=1.0, neginf=0.0)
             np.fill_diagonal(dist_matrix, 0.0)
-            dist_matrix = np.clip(dist_matrix, 0.0, 1.0) #Clipping done to remove invalid values. 
+            dist_matrix = np.clip(dist_matrix, 0.0, 1.0) #Clipping done to remove invalid values.
             condensed = squareform(dist_matrix, checks=True) #Squareform done to convert the distance matrix into condensed distance vector matrix which is required by the linkage function.
             method = self.linkage_method
             Z = hierarchy.linkage(condensed, method=method)
-            
+
             # 4. Cut the dendrogram to produce final labels
             try:
                 final_labels = hierarchy.cut_tree(Z, n_clusters=self.n_clusters).reshape(-1)
             except ValueError:
                 # Sometimes Z is invalid for cut_tree; fall back to flat clustering
                 final_labels = hierarchy.fcluster(Z, t=self.n_clusters, criterion='maxclust')
-            
+
             return final_labels
 
         elif self.precomputed == True:
@@ -774,18 +792,19 @@ class Disagreement(Fusion):
     Disagreement fusion function.
 
     Creates the disagreement of two clusterings.
-    
+
     # The input is a list of clusterings. Each view is presumably an array of cluster labels for n data points for each view.
     # Finds how many data points are in the first set of labels.
     # Initializes an nxn matrix of zeros. This will accumulate the disagreements.
     # Loops over each cluster:
         # Counts the views
-        # Compute res: For each pair of data points (x,y), it checks if the labels are different. If yes, int (x !=y) is 1, otherwise 0. 
+        # Compute res: For each pair of data points (x,y), it checks if the labels are different. If yes, int (x !=y) is 1, otherwise 0.
         # This gives an nxn matrix with res[i,j]=1 if the i-th point and j-th point have different labels in that view, or 0 if they share the same label.
-        # Accumulate: labels=labels+res adds the pairwise disagreements from this view to the running total. 
+        # Accumulate: labels=labels+res adds the pairwise disagreements from this view to the running total.
     # It returns the final nxn matrix, where labels[i,j] indicates how many of the clusterings (out of all views) classified data point i and point j differently.
     """
     def __init__(self) -> None:
+        """Initialize the object."""
         super().__init__()
 
     def execute(self, views: list) -> list:
@@ -811,6 +830,7 @@ class Agreement(Fusion):
     Creates the agreement of multiple clusterings, then converts to a distance matrix.
     """
     def __init__(self) -> None:
+        """Initialize the object."""
         super().__init__()
 
     def execute(self, views: list) -> np.ndarray:
@@ -844,10 +864,12 @@ class Consensus(Fusion):
     Builds a strict-intersection consensus clustering, then converts to distances.
     """
     def __init__(self) -> None:
+        """Initialize the object."""
         super().__init__()
 
     def execute(self, views: list) -> np.ndarray:
         # Ensure we have NumPy arrays (critical for elementwise ==)
+        """Handle execute."""
         views = [np.asarray(v) for v in views]
 
         n_samp  = len(views[0])
@@ -873,7 +895,7 @@ class Consensus(Fusion):
         distances = 1 - mat_bin.astype(float)
         np.fill_diagonal(distances, 0)
         return distances
-    
+
 
 
 class View(object):
@@ -926,6 +948,7 @@ class View(object):
     """
     def __init__(self, data, clusterer: List[Clusterer]) -> None:
 
+        """Initialize the object."""
         self.data = np.asarray(data)
         self.clusterer = clusterer
         self.labels = None
@@ -954,6 +977,7 @@ class Ward(Clusterer):
     Implements the 'Ward' clustering algorithm.
     """
     def __init__(self) -> None:
+        """Initialize the object."""
         super().__init__()
         raise NotImplementedError("Deprecated.")
 
@@ -969,6 +993,7 @@ class Complete(Clusterer):
     Implements the 'complete' clustering algorithm.
     """
     def __init__(self) -> None:
+        """Initialize the object."""
         super().__init__()
         raise NotImplementedError("Deprecated.")
 
@@ -984,6 +1009,7 @@ class Average(Clusterer):
     Implements the 'average' clustering algorithm.
     """
     def __init__(self) -> None:
+        """Initialize the object."""
         super().__init__()
         raise NotImplementedError("Deprecated.")
 
@@ -999,6 +1025,7 @@ class Single(Clusterer):
     Implements the 'single' clustering algorithm.
     """
     def __init__(self) -> None:
+        """Initialize the object."""
         super().__init__()
         raise NotImplementedError("Deprecated.")
 
@@ -1027,6 +1054,7 @@ class Ensemble(object):
                  mincluster: bool = False,
                  mincluster_n: int = 10) -> None:
 
+        """Initialize the object."""
         if isinstance(views, View):
             self.views = [views]
         elif isinstance(views, list):

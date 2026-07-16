@@ -1,4 +1,5 @@
 #!/bin/bash
+# Purpose: Gather bootstrap scores and prepare the next GA generation.
 #SBATCH --job-name=ga_gather
 #SBATCH --output=logs/fold${FOLD_INDEX}_gen${GEN}_gather.log
 #SBATCH --nodes=1

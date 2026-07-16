@@ -1,3 +1,5 @@
+"""Train support-vector classifiers and summarize predictive performance."""
+
 # SVM classification
 
 import pandas as pd
@@ -69,6 +71,7 @@ def svm_predict_with_uncertainty(model, X):
 
 
 def _get_feature_names(X):
+    """Return feature names."""
     if isinstance(X, pd.DataFrame):
         return list(X.columns)
     return [f"x{i}" for i in range(X.shape[1])]
@@ -112,7 +115,9 @@ def svm_feature_contributions(model, X, y, scoring="balanced_accuracy", n_repeat
 
 
 def SVM_nested_cv(x, y, outer_splits=5, inner_splits=3, n_jobs=-1):
+    """Handle svm nested cv."""
     def _counts_and_min(y_vec):
+        """Handle counts and min."""
         y_series = pd.Series(y_vec)
         counts = y_series.value_counts()
         return counts, int(counts.min()) if not counts.empty else 0
@@ -295,6 +300,7 @@ def SVM_nested_cv(x, y, outer_splits=5, inner_splits=3, n_jobs=-1):
 
 def plot_SVM_curves(y, y_pred_cv,recall, precision):
     # Plot the precision-recall curve
+    """Plot svm curves."""
     plt.step(recall, precision, color='b', alpha=0.2, where='post')
     plt.fill_between(recall, precision, step='post', alpha=0.2, color='b')
     plt.xlabel('Recall')

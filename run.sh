@@ -1,4 +1,5 @@
 #!/bin/bash
+# Purpose: Submit the configured end-to-end clustering workflow.
 #SBATCH --job-name=run        # run everything          
 #SBATCH --nodes=1
 #SBATCH --ntasks=1

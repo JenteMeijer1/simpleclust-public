@@ -1,3 +1,5 @@
+"""Summarize the effective cluster count after size enforcement."""
+
 import math
 import statistics
 from collections import Counter

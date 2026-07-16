@@ -1,3 +1,5 @@
+"""Train and evaluate deterministic autoencoders for modality reduction."""
+
 import numpy as np
 import pandas as pd
 import torch
@@ -22,6 +24,7 @@ from skopt.space import Categorical
 class Autoencoder(nn.Module):
     def __init__(self, input_dim, hidden_dim, latent_dim,
                  dropout_rate=0.1, activation_fn=nn.ReLU(), l2_reg=1e-3):
+        """Initialize the object."""
         super().__init__()
         self.encoder = nn.Sequential(
             nn.Linear(input_dim, hidden_dim),
@@ -40,24 +43,29 @@ class Autoencoder(nn.Module):
         self.l2_reg = l2_reg
 
     def forward(self, x):
+        """Handle forward."""
         code = self.encoder(x)
         return self.decoder(code)
 
     def l2_loss(self):
+        """Handle l2 loss."""
         return self.l2_reg * sum(torch.norm(p) for p in self.parameters())
 
     def encode(self, x):
+        """Handle encode."""
         return self.encoder(x)
 
 
 # ─── Training & evaluation helpers ──────────────────────────────────────────
 def _latent_l1_loss(model, xb, l1_reg):
+    """Handle latent l1 loss."""
     if not l1_reg:
         return xb.new_tensor(0.0)
     return float(l1_reg) * model.encode(xb).abs().mean()
 
 
 def train_model(model, dataloader, num_epochs, lr, device, l1_reg=0.0):
+    """Train model."""
     model.to(device)
     optimizer = optim.Adam(model.parameters(), lr=lr)
     criterion = nn.MSELoss()
@@ -72,6 +80,7 @@ def train_model(model, dataloader, num_epochs, lr, device, l1_reg=0.0):
             optimizer.step()
 
 def evaluate_model(model, dataloader, device):
+    """Evaluate model."""
     model.eval()
     preds, trues = [], []
     with torch.no_grad():
@@ -86,6 +95,7 @@ def evaluate_model(model, dataloader, device):
 
 # Early stopping training helper
 def train_model_es(model, train_loader, val_loader, num_epochs, lr, device, patience=15, l1_reg=0.0):
+    """Train model es."""
     model.to(device)
     optimizer = optim.Adam(model.parameters(), lr=lr)
     criterion = nn.MSELoss()
@@ -139,13 +149,14 @@ def run_nested_cv_autoencoder(
     device='cpu',
     l1_reg=0.0
 ):
+    """Run nested cv autoencoder."""
     import os as _os
     from joblib import Parallel as _Parallel, delayed as _delayed
     # Use all logical CPUs on this node
     total_cores = _os.cpu_count() or 1
     outer_jobs = min(outer_splits, total_cores)
     inner_jobs = max(1, total_cores // outer_jobs)
-    
+
     # Change latent dims if data dimensionality is smaller than the latent dim
     if X.shape[1] < max(latent_dims):
         latent_dims = [2, 5, 10]
@@ -162,6 +173,7 @@ def run_nested_cv_autoencoder(
 
     # Helper function for processing a single CV fold in parallel
     def _process_fold(fold, train_idx, test_idx):
+        """Process fold."""
         X_train, X_test = X[train_idx], X[test_idx]
         input_dim = X.shape[1]
 
@@ -175,10 +187,12 @@ def run_nested_cv_autoencoder(
         ]
 
         def objective(vals):
+            """Handle objective."""
             hdim, ldim, act_name, lr, bs = vals
             act_fn = activation_functions[act_name]
             inner_kf = KFold(n_splits=inner_splits, shuffle=True, random_state=42)
             def _inner_eval(i_tr, i_val):
+                """Handle inner eval."""
                 X_tr, X_val = X_train[i_tr], X_train[i_val]
                 mdl = Autoencoder(
                     input_dim=input_dim,
@@ -281,6 +295,7 @@ def run_nested_cv_autoencoder(
 
 # ─── Wrapper to accept a DataFrame or array ───────────────────────────────────
 def prepare_and_run_autoencoder(df, device='cpu', hidden_dims=[128, 256, 512], activation_functions = {'ReLU': nn.ReLU(), 'LeakyReLU': nn.LeakyReLU(), 'selu': nn.SELU(), 'swish': nn.SiLU()}, learning_rates=[0.001, 0.0001], batch_sizes=[32, 64, 128], latent_dims=[2, 5, 10], l1_reg=0.0):
+    """Prepare and run autoencoder."""
     X = df.values if isinstance(df, pd.DataFrame) else df
     return run_nested_cv_autoencoder(
         X,
@@ -294,7 +309,7 @@ def prepare_and_run_autoencoder(df, device='cpu', hidden_dims=[128, 256, 512], a
     )
 
 
-def run_all_modalities(modalities_dict, device='cpu', split = 'discovery', 
+def run_all_modalities(modalities_dict, device='cpu', split = 'discovery',
                                         activation_functions = {'ReLU': nn.ReLU(), 'LeakyReLU': nn.LeakyReLU(), 'selu': nn.SELU(), 'swish': nn.SiLU()}):
     """
     For each modality in modalities_dict (name → DataFrame or array),
@@ -310,7 +325,7 @@ def run_all_modalities(modalities_dict, device='cpu', split = 'discovery',
     """
     latent_vars = {}
 
-    
+
 
     for modality, df in modalities_dict.items():
         print(f"▶️  Running autoencoder for modality: {modality}")
@@ -321,14 +336,14 @@ def run_all_modalities(modalities_dict, device='cpu', split = 'discovery',
 
         # Unpack the 7 outputs; we only need the 1st and last two here
         results, all_true, all_pred, test_latent, train_latent = \
-            prepare_and_run_autoencoder(matrix, device=device, 
+            prepare_and_run_autoencoder(matrix, device=device,
                                         hidden_dims=[128, 256, 512],
                                         activation_functions = {'ReLU': nn.ReLU(), 'LeakyReLU': nn.LeakyReLU(), 'selu': nn.SELU(), 'swish': nn.SiLU()},
                                         learning_rates=[0.001, 0.0001],
                                         batch_sizes=[32, 64, 128],
                                         latent_dims=[2, 5, 10])
-        
-        
+
+
         # Select best hyperparameters (minimum test_loss)
         best = min(results, key=lambda r: r['test_loss'])['params']
 
@@ -348,7 +363,7 @@ def run_all_modalities(modalities_dict, device='cpu', split = 'discovery',
         full_ds = TensorDataset(torch.FloatTensor(X), torch.FloatTensor(X))
         full_ld = DataLoader(full_ds, batch_size=int(best['batch_size']), shuffle=True)
         train_model(final, full_ld, num_epochs=150, lr=best['learning_rate'], device=device)
-        
+
         # Save the final model
         #os.makedirs(f"saved_models_{modality}", exist_ok=True)
         #torch.save({
@@ -361,7 +376,7 @@ def run_all_modalities(modalities_dict, device='cpu', split = 'discovery',
         with torch.no_grad():
             X_tensor = torch.FloatTensor(X).to(device)
             discovery_latents = final.encode(X_tensor).cpu().numpy()
-        
+
 
         # Store just the latents in a dict
         latent_vars = {
@@ -388,6 +403,7 @@ def run_all_modalities(modalities_dict, device='cpu', split = 'discovery',
 
 def load_and_encode(model_path, X_new, device="cpu", activation_functions = {'ReLU': nn.ReLU(), 'LeakyReLU': nn.LeakyReLU(), 'selu': nn.SELU(), 'swish': nn.SiLU()}):
     # Load full checkpoint (not just weights)
+    """Load and encode."""
     ckpt = torch.load(model_path, map_location=device, weights_only=False)
 
     # Reconstruct the same architecture
@@ -412,7 +428,7 @@ def load_and_encode(model_path, X_new, device="cpu", activation_functions = {'Re
 
 
 
-def run_all_modalities_test(modalities_dict, device='cpu', split = 'test', 
+def run_all_modalities_test(modalities_dict, device='cpu', split = 'test',
                                         hidden_dims=[128, 256, 512],
                                         activation_functions = {'ReLU': nn.ReLU(), 'LeakyReLU': nn.LeakyReLU(), 'selu': nn.SELU(), 'swish': nn.SiLU()},
                                         learning_rates=[0.001, 0.0001],
@@ -479,14 +495,14 @@ def run_AE_complete (modalities_dict, device='cpu', split = 'discovery', hidden_
 
         # Unpack the 7 outputs; we only need the 1st and last two here
         results, all_true, all_pred, test_latent, train_latent = \
-            prepare_and_run_autoencoder(matrix, device=device, 
+            prepare_and_run_autoencoder(matrix, device=device,
                                         hidden_dims=hidden_dims,
                                         activation_functions = activation_functions,
                                         learning_rates=learning_rates,
                                         batch_sizes=batch_sizes,
                                         latent_dims=latent_dims,
                                         l1_reg=l1_reg)
-        
+
         # Select best hyperparameters (minimum test_loss)
         best = min(results, key=lambda r: r['test_loss'])['params']
 
@@ -506,7 +522,7 @@ def run_AE_complete (modalities_dict, device='cpu', split = 'discovery', hidden_
         full_ds = TensorDataset(torch.FloatTensor(X), torch.FloatTensor(X))
         full_ld = DataLoader(full_ds, batch_size=int(best['batch_size']), shuffle=True)
         train_model(final, full_ld, num_epochs=150, lr=best['learning_rate'], device=device, l1_reg=l1_reg)
-        
+
         # Save the final model
         #os.makedirs(f"saved_models_{modality}", exist_ok=True)
         #torch.save({
@@ -519,7 +535,7 @@ def run_AE_complete (modalities_dict, device='cpu', split = 'discovery', hidden_
         with torch.no_grad():
             X_tensor = torch.FloatTensor(X).to(device)
             discovery_latents = final.encode(X_tensor).cpu().numpy()
-        
+
 
         # Store just the latents in a dict
         latent_vars = {
@@ -536,7 +552,7 @@ def run_AE_complete (modalities_dict, device='cpu', split = 'discovery', hidden_
             'latent_vars': latent_vars,
             'final_latent': discovery_latents
         }
-    
+
         # Combine all modalities into a dictionary
         results_by_modality[modality] = results_one_modality
 

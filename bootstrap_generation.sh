@@ -1,4 +1,5 @@
 #!/bin/bash
+# Purpose: Run one generation of bootstrap candidate evaluation.
 #SBATCH --job-name=ga_bootstrap
 #SBATCH --output=logs/fold${FOLD_INDEX}_gen${GEN}_boot%a.log
 #SBATCH --nodes=1

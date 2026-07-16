@@ -1,4 +1,5 @@
 #!/bin/bash
+# Purpose: Merge completed folds and create the final clustering outputs.
 #SBATCH --job-name=merge
 #SBATCH --output=logs/merge.log
 #SBATCH --nodes=1

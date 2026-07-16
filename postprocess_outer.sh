@@ -1,4 +1,5 @@
 #!/bin/bash
+# Purpose: Post-process one completed outer fold.
 #SBATCH --job-name=postprocess
 #SBATCH --output=logs/fold${FOLD_INDEX}_postprocess.log
 #SBATCH --nodes=1

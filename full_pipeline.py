@@ -94,10 +94,12 @@ METRICS_SCHEMA_VERSION = 2
 
 
 def _flag_enabled(value):
+    """Handle flag enabled."""
     return str(value).strip().upper() == "TRUE"
 
 
 def _operational_min_cluster_n(args, current_n, reference_n):
+    """Handle operational min cluster n."""
     return resolve_min_cluster_n(
         args.mincluster_n,
         current_n=current_n,
@@ -114,6 +116,7 @@ def _derive_seed(*parts, base=0):
 
 
 def _seed_everything(seed):
+    """Handle seed everything."""
     np.random.seed(int(seed))
     random.seed(int(seed))
     if torch is not None:
@@ -121,6 +124,7 @@ def _seed_everything(seed):
 
 
 def _ga_bootstrap_seed(fold_index, bootstrap_index):
+    """Handle ga bootstrap seed."""
     return _derive_seed(
         "ga_bootstrap",
         int(fold_index or 0),
@@ -191,6 +195,7 @@ DIM_REDUCTION_ALIASES = {
 
 
 def _normalize_method_list(values):
+    """Normalize method list."""
     out = []
     for val in values or []:
         if isinstance(val, str) and "," in val:
@@ -207,6 +212,7 @@ def _normalize_method_list(values):
 
 
 def _normalize_dim_reduction_method(value):
+    """Normalize dim reduction method."""
     if value is None:
         return "none"
     text = str(value).strip().lower()
@@ -219,6 +225,7 @@ def _normalize_dim_reduction_method(value):
 
 
 def _parse_dim_reduction_overrides(raw_overrides, modalities, default_method):
+    """Parse dim reduction overrides."""
     methods = {mod: default_method for mod in modalities}
     if not raw_overrides:
         return methods
@@ -241,6 +248,7 @@ def _parse_dim_reduction_overrides(raw_overrides, modalities, default_method):
 
 
 def _parse_dummy_code_modalities(raw_modalities, modalities):
+    """Parse dummy code modalities."""
     if raw_modalities is None:
         return list(modalities)
 
@@ -263,6 +271,7 @@ def _parse_dummy_code_modalities(raw_modalities, modalities):
 
 
 def _validate_mixed_categorical_dim_reduction(mixed_categorical_modalities, modality_dim_reduction):
+    """Validate mixed categorical dim reduction."""
     mixed = list(mixed_categorical_modalities or [])
     invalid = [
         f"{mod}={modality_dim_reduction.get(mod)}"
@@ -277,6 +286,7 @@ def _validate_mixed_categorical_dim_reduction(mixed_categorical_modalities, moda
 
 
 def _build_autoencoder_modalities(dict_final, modalities, subject_id_column, selected_modalities):
+    """Build autoencoder modalities."""
     selected = set(selected_modalities)
     return {
         mod: (
@@ -289,6 +299,7 @@ def _build_autoencoder_modalities(dict_final, modalities, subject_id_column, sel
 
 
 def _one_hot_encoder():
+    """Handle one hot encoder."""
     try:
         return OneHotEncoder(handle_unknown="ignore", sparse_output=False)
     except TypeError:
@@ -296,6 +307,7 @@ def _one_hot_encoder():
 
 
 def _low_cardinality_numeric_columns(df, max_unique=10):
+    """Handle low cardinality numeric columns."""
     cols = []
     for col in df.select_dtypes(include=[np.number]).columns:
         n_unique = df[col].dropna().nunique()
@@ -305,6 +317,7 @@ def _low_cardinality_numeric_columns(df, max_unique=10):
 
 
 def _run_mixed_type_svd(df, subject_id_column, method, random_state):
+    """Run mixed type svd."""
     Xdf = df.drop(columns=[subject_id_column], errors="ignore").copy()
     if Xdf.empty:
         return np.empty((len(df), 0), dtype=np.float32)
@@ -593,6 +606,7 @@ def _get_multi_fitness_class(args):
 # --- Utility functions ---------------------------------------
 _DATA = {}
 def _init_worker(data_list, subject_id_list, args=None):
+    """Handle init worker."""
     _DATA.clear()
     _DATA["data_list"] = data_list
     _DATA["subject_id_list"] = subject_id_list
@@ -601,6 +615,7 @@ def _init_worker(data_list, subject_id_list, args=None):
 
 # Helper function for parallel clustering in bootstrap (now only takes the candidate)
 def _cluster_candidate(cand, args=None):
+    """Handle cluster candidate."""
     data_list = _DATA["data_list"]
     subject_id_list = _DATA["subject_id_list"]
     if args is None and "args" in _DATA:
@@ -1461,7 +1476,7 @@ def _compute_fitness_for_ind(
         else:
             fname = f"fitness_{i}.pkl"
         save_pickle(os.path.join(cache_dir, fname), fitness_record)
-    
+
 
     # Build summary dict and return requested objectives
     summary = {
@@ -1789,6 +1804,7 @@ def do_bootstrap(args):
         #  - Calinski–Harabasz normalized via ch/(ch+1)
         #  - Davies–Bouldin transformed via 1/(1+db) (higher is better)
         def _per_view_composite_qualities(X_list, indiv_labs):
+            """Handle per view composite qualities."""
             vals = []
             for X, labs in zip(X_list, indiv_labs):
                 labs = np.asarray(labs)
@@ -1947,6 +1963,7 @@ def do_gather(args):
     import re
 
     def numeric_boot_dirs(path):
+        """Handle numeric boot dirs."""
         m = re.search(r'bootstrap_(\d+)', path)
         return int(m.group(1)) if m else -1
 
@@ -1960,6 +1977,7 @@ def do_gather(args):
     # from stability estimation below.
     label_dicts_all = [dill.load(open(fn, 'rb')) for fn in files]
     def _usable(d):
+        """Handle usable."""
         return isinstance(d, dict) and len(d.get("final_labels", [])) > 0 and len(d.get("orig_ids", [])) > 0
     label_dicts = [d for d in label_dicts_all if _usable(d)]
 
@@ -2137,6 +2155,7 @@ def do_gather(args):
         avg_quals_per_mod = []
 
         def _metric_matrix_from_sum_mat(metric):
+            """Handle metric matrix from sum mat."""
             rows = []
             for m in summary_metrics:
                 sum_mat = m.get("view_stabs_SUM_MAT")
@@ -2147,6 +2166,7 @@ def do_gather(args):
             return np.array(rows, dtype=float)
 
         def _nanmax_axis0_or_nan(matrix):
+            """Handle nanmax axis0 or nan."""
             matrix = np.asarray(matrix, dtype=float)
             out = np.full(matrix.shape[1], np.nan, dtype=float)
             finite_cols = np.any(np.isfinite(matrix), axis=0)
@@ -2239,6 +2259,7 @@ def do_gather(args):
     #linkages = ['complete','average','weighted']
 
     def mutate(individual):
+        """Handle mutate."""
         idx = random.randint(0, len(individual) - 1)
         if idx in k_positions:
             individual[idx] = random.randint(args.k_min, args.k_max)
@@ -2558,6 +2579,7 @@ def do_outer(args):
         raise RuntimeError(f"[Fold {args.fold_index}] Hall of fame did not contain any candidates.")
 
     def _fit_candidate_on_training_fold(candidate):
+        """Fit candidate on training fold."""
         candidate_params = convert_to_parameters(len(args.modalities), candidate)
         fold_mincluster_n = _operational_min_cluster_n(args, len(base_ids), len(df))
         candidate_result = parea_2_mv(
@@ -2656,7 +2678,7 @@ def do_outer(args):
     mean_view_qual = summary.get(qual_view_key)
     final_stab = summary.get(stab_final_key)
     final_qual = summary.get(qual_final_key)
-    
+
     # Additional stability flavours for output
     #mean_view_stab_coassoc = summary.get("mean_view_stability_coassoc")
     #mean_view_stab_ccc = summary.get("mean_view_stability_CCC")
@@ -2923,6 +2945,7 @@ def do_merge(args):
     # then quality. This keeps reproducibility ahead of cluster separation.
     fold_names = list(metrics.keys())
     def _finite_mean(values):
+        """Handle finite mean."""
         vals = [float(v) for v in values if v is not None and np.isfinite(v)]
         return float(np.mean(vals)) if vals else np.nan
 
@@ -2931,6 +2954,7 @@ def do_merge(args):
         bf = fold_payload.get("best_fitness", {})
 
         def _first_finite(candidates):
+            """Handle first finite."""
             for val in candidates:
                 if val is not None and np.isfinite(val):
                     return float(val)
@@ -2962,6 +2986,7 @@ def do_merge(args):
         }
 
     def _fallback_value_key(value):
+        """Handle fallback value key."""
         if isinstance(value, (int, float, np.integer, np.floating)):
             return (0, float(value))
         return (1, str(value))
@@ -2991,6 +3016,7 @@ def do_merge(args):
         return rows
 
     def _rank_parameter_values(col, values, view_index=None):
+        """Rank parameter values."""
         part = "view" if col in ("k_s", "linkage") else "final"
         unique_values = []
         for value in values:
@@ -3048,6 +3074,7 @@ def do_merge(args):
             param_selection[col] = ranked
 
     def _params_from_component_ranks(component_ranks):
+        """Handle params from component ranks."""
         params = {}
         for slot, value_rank in zip(parameter_slots, component_ranks):
             value = slot["ranked"][value_rank]["value"]
@@ -3162,7 +3189,7 @@ def do_merge(args):
     ae_cluster = {mod: ae_res[mod]['final_latent'] for mod in args.modalities}
     data_list = [ae_cluster[mod] for mod in args.modalities]
 
-    # Apply Parea with best parameters on full data 
+    # Apply Parea with best parameters on full data
     #labels, indiv_labels, view_scores_per_view, view_score_mean, final_score = parea_2_mv(
     #    data_list,
     #    subject_id_list=subject_id_list,
@@ -3240,7 +3267,7 @@ def do_merge(args):
     full_final_effective_k_summary = None
     full_view_effective_k_summaries = None
 
-    
+
 
     def _run_bootstrap(seed_value):
         """Run one final stability resample under the selected preprocessing mode."""
@@ -3390,6 +3417,7 @@ def do_merge(args):
                 return list(executor.map(func, items))
 
     def _chunk_items(items, n_chunks):
+        """Handle chunk items."""
         items = list(items)
         if not items:
             return []
@@ -3522,6 +3550,7 @@ def do_merge(args):
             ]
 
             def _align_labels_to_ids(union_ids, labels, target_ids, fill_value=-1):
+                """Handle align labels to ids."""
                 if union_ids is None or labels is None:
                     return None
                 idx_map = {sid: i for i, sid in enumerate(union_ids)}
@@ -3536,6 +3565,7 @@ def do_merge(args):
                 return aligned
 
             def _silhouette_norm(mat, labels, precomputed=False):
+                """Handle silhouette norm."""
                 labels = np.asarray(labels)
                 if len(np.unique(labels)) <= 1:
                     result = 0.0
@@ -3551,6 +3581,7 @@ def do_merge(args):
                 return float(np.nan_to_num(result, nan=0.0, posinf=0.0, neginf=0.0))
 
             def _ch_norm(X, labels):
+                """Handle ch norm."""
                 labels = np.asarray(labels)
                 if len(np.unique(labels)) <= 1:
                     result = 0.0
@@ -3563,6 +3594,7 @@ def do_merge(args):
                 return float(np.nan_to_num(result, nan=0.0, posinf=0.0, neginf=0.0))
 
             def _db_inv(X, labels):
+                """Handle db inv."""
                 labels = np.asarray(labels)
                 if len(np.unique(labels)) <= 1:
                     result = 0.0
@@ -3575,6 +3607,7 @@ def do_merge(args):
                 return float(np.nan_to_num(result, nan=0.0, posinf=0.0, neginf=0.0))
 
             def _composite_view_quality(X, labels):
+                """Handle composite view quality."""
                 labels = np.asarray(labels)
                 if len(np.unique(labels)) <= 1:
                     return 0.0
@@ -3584,6 +3617,7 @@ def do_merge(args):
                 return (s + c + d) / 3.0
 
             def _classical_mds(D, p=10):
+                """Handle classical mds."""
                 D = np.asarray(D, dtype=float)
                 n = D.shape[0]
                 if n == 0:
@@ -3868,7 +3902,7 @@ def do_merge(args):
 
 
 
-            
+
     t_stability_start = time.time()
     selected_candidate_rank = None
     attempted_final_candidates = []
@@ -4046,7 +4080,7 @@ def do_merge(args):
 
 
 
-    
+
     # Decide which stability metric should be exposed as "primary" in the final
     # payload. The raw ARI/Jaccard/MAT diagnostics are still saved separately.
     stab_view_key, stab_final_key, _, _ = _primary_metric_keys(args)
@@ -4120,6 +4154,7 @@ def do_merge(args):
     }
 
     def _pval_silhouette_norm(X, labels):
+        """Handle pval silhouette norm."""
         labels = np.asarray(labels)
         valid = labels >= 0
         if not np.any(valid):
@@ -4135,6 +4170,7 @@ def do_merge(args):
             return np.nan
 
     def _pval_ch_norm(X, labels):
+        """Handle pval ch norm."""
         labels = np.asarray(labels)
         valid = labels >= 0
         if not np.any(valid):
@@ -4150,6 +4186,7 @@ def do_merge(args):
             return np.nan
 
     def _pval_db_inv(X, labels):
+        """Handle pval db inv."""
         labels = np.asarray(labels)
         valid = labels >= 0
         if not np.any(valid):
@@ -4253,6 +4290,7 @@ def do_merge(args):
             ]
 
             def _perm_worker(seed_value):
+                """Handle perm worker."""
                 rng = np.random.default_rng(seed_value)
                 perm_indiv_labels = [
                     _shuffle_labels_fixed_counts(labs, rng)
@@ -4274,6 +4312,7 @@ def do_merge(args):
                 perm_results = [_perm_worker(s) for s in seeds_perm]
             else:
                 def _perm_chunk_worker(seed_values):
+                    """Handle perm chunk worker."""
                     return [_perm_worker(seed_value) for seed_value in seed_values]
 
                 perm_chunks = _chunk_items(seeds_perm, workers)
@@ -4442,6 +4481,7 @@ def do_merge(args):
         }
 
     def _classical_mds_local(D, p=10):
+        """Handle classical mds local."""
         D = np.asarray(D, dtype=float)
         n = D.shape[0]
         if n == 0:
@@ -4622,6 +4662,7 @@ def do_merge(args):
         ]
 
         def _ari_perm_worker(seed_value):
+            """Handle ari perm worker."""
             rng = np.random.default_rng(seed_value)
             perm_final = _permute_collapsed_labels(final_labels_collapsed, rng)
             perm_final_mean = _mean_pairwise_ari_from_alignment(perm_final, final_pair_align)
@@ -4635,6 +4676,7 @@ def do_merge(args):
             ari_perm_results = [_ari_perm_worker(s) for s in seeds_ari]
         else:
             def _ari_perm_chunk_worker(seed_values):
+                """Handle ari perm chunk worker."""
                 return [_ari_perm_worker(seed_value) for seed_value in seed_values]
 
             ari_chunks = _chunk_items(seeds_ari, ari_workers)
@@ -4799,6 +4841,7 @@ def do_merge(args):
     }
 
     def _final_reporting_with_runtime():
+        """Handle final reporting with runtime."""
         rep = dict(final_reporting)
         rc = dict(rep.get("runtime_context", {}))
         rc["total_merge_seconds"] = float(time.time() - t_merge_start)
@@ -4806,7 +4849,9 @@ def do_merge(args):
         return rep
 
     def _merge_extra_metrics():
+        """Merge extra metrics."""
         def _cluster_sizes(labels):
+            """Handle cluster sizes."""
             if labels is None:
                 return {}
             arr = np.asarray(labels)
@@ -4981,13 +5026,14 @@ def do_merge(args):
         # representation for each modality.
         X_train_list = [_svm_features_for_modality(mod) for mod in args.modalities]
         X_train = pd.concat(X_train_list, axis=1)
-        
+
 
         # Use the final cluster labels as training labels
         clusters = final_labels
         clusters_indiv = indiv_labels
 
         def _svm_label_status(labels):
+            """Handle svm label status."""
             if labels is None:
                 return False, "labels are missing", {}
             labels = np.asarray(labels)
@@ -5316,7 +5362,7 @@ def do_init(args):
     # without relying on positional knowledge elsewhere in the pipeline.
     for ind in pop:
         ind.gene_names = names
-    
+
     os.makedirs(os.path.dirname(population_file) or '.', exist_ok=True)
     with open(population_file, 'wb') as f:
         dill.dump(pop, f)
@@ -5551,13 +5597,13 @@ def do_test3(args):
             print("Fusion matrix is symmetric.")
         else:
             print("Warning: Fusion matrix is not symmetric.")
-        
+
         # Inspect the fusion matrix on zeros on diagonal
         if np.all(np.diag(fusion_matrix) == 0):
             print("Fusion matrix has zeros on its diagonal.")
         else:
             print("Warning: Fusion matrix diagonal has non-zero entries.")
-        
+
         # Inspect values in the fusion matrix
         print(f"Fusion matrix values range from {np.min(fusion_matrix)} to {np.max(fusion_matrix)}")
 
@@ -5608,7 +5654,7 @@ def do_test3(args):
 
 
     sys.exit(0)
-        
+
 
 def do_test4(args):
     """
@@ -5703,7 +5749,7 @@ def do_test4(args):
 
         # Final clustering on the fused distance matrix
         k_final=8
-        v_res = fusion_matrix 
+        v_res = fusion_matrix
 
         if not k_final:
             raise ValueError(
@@ -5736,6 +5782,7 @@ def do_test4(args):
         # Quality metric: Silhouette only (normalized to [0,1]).
         # For precomputed distances we use metric='precomputed'; for feature matrices we use the standard silhouette.
         def compute_quality(mat, labels, precomputed=False):
+            """Calculate quality."""
             labels = np.asarray(labels)
             if len(np.unique(labels)) <= 1:
                 return 0.0
@@ -5758,7 +5805,7 @@ def do_test4(args):
         print(f"Final clustering produced {len(np.unique(final_labels))} clusters with sizes {np.bincount(final_labels)}")
         print(f"View-level quality scores for fusion method {fusion_method}: {view_scores_per_view}")
         print(f"Mean view-level quality: {view_score:.4f}, final clustering quality: {final_score:.4f} for fusion method: {fusion_method}")
-    
+
     sys.exit(0)
 
 
@@ -5964,4 +6011,4 @@ if __name__ == '__main__':
     else:
         parser.error(f"Unknown mode: {args.mode}")
 
-   
+

@@ -5,6 +5,8 @@ date: "2025-01-20"
 output: html_document
 ---
 
+This notebook prepares the SimpleClust analysis data and demographic tables.
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 
@@ -522,4 +524,3 @@ print(table)
 save_as_docx(table, path = "path/to/simpleclust_data/Dem_table_sample_simpleclust.docx")
 
 ```
-

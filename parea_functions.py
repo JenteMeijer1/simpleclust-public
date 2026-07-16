@@ -1,3 +1,5 @@
+"""Provide supporting operations for Parea ensemble clustering."""
+
 # Parea functions
 
 import random
@@ -26,9 +28,9 @@ FUSION_METHODS = ['agreement', 'consensus', 'disagreement']
 LINKAGES = ['complete', 'average', 'weighted', 'ward', 'ward2']
 
 def clusterer(clusterer: str, precomputed: bool=False, **kwargs) -> Clusterer:
-    #It tests which cluster method is given. For each cluster method there is a seperate function in the structure.py file. 
+    #It tests which cluster method is given. For each cluster method there is a seperate function in the structure.py file.
     # Each of these functions are relatively simple so no need to add them here. It calls a function to perform a specific clustering.
-    # If we want to add clustering methods, look at these functions on how to do that and make a similar function for the new clustering method. #TODO 
+    # If we want to add clustering methods, look at these functions on how to do that and make a similar function for the new clustering method. #TODO
 
     """
     Creates a :class:`~pyrea.structure.Clusterer` object to be used when
@@ -129,7 +131,7 @@ def clusterer(clusterer: str, precomputed: bool=False, **kwargs) -> Clusterer:
             kwargs['metric']='precomputed'
 
         return OPTICSPyrea(**kwargs)
-    
+
     elif clusterer == 'gmm':
         return ModelBasedClusteringPyrea(**kwargs)
 
@@ -141,12 +143,12 @@ def clusterer(clusterer: str, precomputed: bool=False, **kwargs) -> Clusterer:
 
     elif clusterer == 'birch':
         return BIRCHPyrea(**kwargs)
-    
+
     elif clusterer == 'ensemble':
         return EnsembleClusteringPyrea(precomputed=precomputed, **kwargs)
     else:
         raise ValueError("Unknown clustering method.")
-    
+
 
 def view(data: array, clusterer: Clusterer) -> View:
     """
@@ -271,6 +273,7 @@ def parea_2_mv(
     internal_ensemble_seed=0
 ):
     # Sanity checks and linkage broadcasting
+    """Handle parea 2 mv."""
     if isinstance(linkage, str):
         linkage = [linkage] * len(data)
     if len(data) != len(k_s) or len(data) != len(linkage):
@@ -284,6 +287,7 @@ def parea_2_mv(
     # If you require clusters of at least `mincluster_n`, you cannot have more than
     # floor(N / mincluster_n) clusters (otherwise at least one cluster must be too small).
     def _mincluster_enabled(x):
+        """Handle mincluster enabled."""
         if isinstance(x, str):
             return x.strip().upper() == "TRUE"
         return bool(x)
@@ -356,7 +360,7 @@ def parea_2_mv(
             aligned_labels.append(lbl)
             used_view_idx += 1
     individual_labels = aligned_labels
-    
+
 
     ## TODO: Check if we can delete this part and just use the fusion_matrix.
     # --- Ensure the fused matrix is a distance matrix for downstream steps ---
@@ -424,6 +428,7 @@ def parea_2_mv(
     # --- Quality metrics: composite indices for views and final ---
     # One-cluster solutions are treated as degenerate during GA optimisation.
     def _silhouette_norm(mat, labels, precomputed=False):
+        """Handle silhouette norm."""
         labels = np.asarray(labels)
         if len(np.unique(labels)) <= 1:
             result = 0.0
@@ -439,6 +444,7 @@ def parea_2_mv(
         return float(np.nan_to_num(result, nan=0.0, posinf=0.0, neginf=0.0))
 
     def _ch_norm(X, labels):
+        """Handle ch norm."""
         labels = np.asarray(labels)
         if len(np.unique(labels)) <= 1:
             result = 0.0
@@ -451,6 +457,7 @@ def parea_2_mv(
         return float(np.nan_to_num(result, nan=0.0, posinf=0.0, neginf=0.0))
 
     def _db_inv(X, labels):
+        """Handle db inv."""
         labels = np.asarray(labels)
         if len(np.unique(labels)) <= 1:
             result = 0.0
@@ -463,6 +470,7 @@ def parea_2_mv(
         return float(np.nan_to_num(result, nan=0.0, posinf=0.0, neginf=0.0))
 
     def _composite_view_quality(X, labels):
+        """Handle composite view quality."""
         labels = np.asarray(labels)
         if len(np.unique(labels)) <= 1:
             return 0.0
@@ -473,6 +481,7 @@ def parea_2_mv(
 
     def _classical_mds(D, p=10):
         # Deterministic classical MDS from distance matrix D (NxN)
+        """Handle classical mds."""
         D = np.asarray(D, dtype=float)
         n = D.shape[0]
         if n == 0:
@@ -596,4 +605,4 @@ def convert_to_parameters(data_len, individual):
 
     return params
 
- 
+

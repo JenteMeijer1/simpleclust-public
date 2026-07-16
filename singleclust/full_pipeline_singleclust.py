@@ -87,10 +87,12 @@ METRICS_SCHEMA_VERSION = 3
 
 
 def _flag_enabled(value):
+    """Handle flag enabled."""
     return str(value).strip().upper() == "TRUE"
 
 
 def _operational_min_cluster_n(args, current_n, reference_n):
+    """Handle operational min cluster n."""
     return resolve_min_cluster_n(
         args.mincluster_n,
         current_n=current_n,
@@ -100,12 +102,14 @@ def _operational_min_cluster_n(args, current_n, reference_n):
 
 
 def _derive_seed(*parts, base=0):
+    """Handle derive seed."""
     payload = "|".join(str(part) for part in (base,) + tuple(parts)).encode("utf-8")
     seed = int.from_bytes(hashlib.blake2b(payload, digest_size=8).digest(), "little")
     return seed % _MAX_32BIT_SEED
 
 
 def _seed_everything(seed):
+    """Handle seed everything."""
     np.random.seed(int(seed))
     random.seed(int(seed))
     if torch is not None:
@@ -113,6 +117,7 @@ def _seed_everything(seed):
 
 
 def _search_bootstrap_seed(fold_index, bootstrap_index):
+    """Handle search bootstrap seed."""
     return _derive_seed(
         "singleclust_search_bootstrap",
         int(fold_index or 0),
@@ -138,6 +143,7 @@ DEFAULT_SEARCH_OBJECTIVES = ["stab_ari", "quality"]
 
 
 def _normalize_method_list(values):
+    """Normalize method list."""
     out = []
     for val in values or []:
         if isinstance(val, str) and "," in val:
@@ -281,6 +287,7 @@ def _build_grid_population(args):
 # --- Utility functions ---------------------------------------
 _DATA = {}
 def _init_worker(data_list, subject_id_list, args=None):
+    """Handle init worker."""
     _DATA.clear()
     _DATA["data_list"] = data_list
     _DATA["subject_id_list"] = subject_id_list
@@ -289,6 +296,7 @@ def _init_worker(data_list, subject_id_list, args=None):
 
 # Helper function for parallel clustering in bootstrap (now only takes the candidate)
 def _cluster_candidate(cand, args=None):
+    """Handle cluster candidate."""
     data_list = _DATA["data_list"]
     subject_id_list = _DATA["subject_id_list"]
     if args is None and "args" in _DATA:
@@ -331,6 +339,7 @@ def _init_merge_bootstrap_worker(
     meta=None,
     args=None,
 ):
+    """Handle init merge bootstrap worker."""
     _DATA.clear()
     _DATA["merge_X_latent"] = np.asarray(X_latent, dtype=np.float32, copy=False)
     _DATA["merge_ids_all"] = list(ids_all)
@@ -349,6 +358,7 @@ def _init_merge_bootstrap_worker(
 
 
 def _run_merge_bootstrap(bootstrap_index):
+    """Run merge bootstrap."""
     X_latent = _DATA["merge_X_latent"]
     ids_all = _DATA["merge_ids_all"]
     final_params = _DATA["merge_final_params"]
@@ -443,6 +453,7 @@ def _run_sparse_pca(X_df, args, seed_value):
 
 
 def _nonnegative_matrix_for_nmf(X):
+    """Handle nonnegative matrix for nmf."""
     X = np.asarray(X, dtype=np.float32)
     X = np.nan_to_num(X, nan=0.0, posinf=0.0, neginf=0.0)
     if X.shape[0] == 0 or X.shape[1] == 0:
@@ -454,6 +465,7 @@ def _nonnegative_matrix_for_nmf(X):
 
 
 def _make_sparse_nmf(n_components, alpha, l1_ratio, max_iter, random_state):
+    """Create sparse nmf."""
     kwargs = dict(
         n_components=int(n_components),
         init="nndsvda",
@@ -1322,7 +1334,7 @@ def _compute_fitness_for_ind(
         else:
             fname = f"fitness_{i}.pkl"
         save_pickle(os.path.join(cache_dir, fname), fitness_record)
-    
+
 
     # Build summary dict and return requested objectives
     summary = {
@@ -1632,6 +1644,7 @@ def do_gather(args):
     import re
 
     def numeric_boot_dirs(path):
+        """Handle numeric boot dirs."""
         m = re.search(r'bootstrap_(\d+)', path)
         return int(m.group(1)) if m else -1
 
@@ -1656,6 +1669,7 @@ def do_gather(args):
         with open(filename, 'rb') as handle:
             label_dicts_all.append(dill.load(handle))
     def _usable(d):
+        """Handle usable."""
         return isinstance(d, dict) and len(d.get("labels", [])) > 0 and len(d.get("orig_ids", [])) > 0
     label_dicts = [d for d in label_dicts_all if _usable(d)]
 
@@ -1869,6 +1883,7 @@ def do_gather(args):
     return
 
 def _activation_function_map(names):
+    """Handle activation function map."""
     available = {
         "ReLU": nn.ReLU(),
         "LeakyReLU": nn.LeakyReLU(),
@@ -1993,7 +2008,33 @@ def _build_latent_matrix(args, ae_data, df_final, seed_value, subject_id_column=
     raise ValueError(f"Unknown dim_reduction method: {args.dim_reduction}")
 
 
+def _simpleclust_svm_training_matrix(args, ae_res, df_final, preprocessing_artifact=None):
+    """Return the final SVM matrix in the same representation used for clustering."""
+    dim = None if args.dim_reduction is None else str(args.dim_reduction).lower()
+    if dim in (None, 'none'):
+        X_train = df_final.drop(columns=[args.subject_id_column], errors='ignore').reset_index(drop=True)
+        return X_train, 'preprocessed_features'
+
+    latent = np.asarray(_autoencoder_final_latent(ae_res), dtype=np.float32)
+    if latent.ndim == 1:
+        latent = latent.reshape(-1, 1)
+
+    modality_prefix = 'singleclust'
+    if isinstance(preprocessing_artifact, dict):
+        preprocessing_details = preprocessing_artifact.get('preprocessing_details') or {}
+        modalities = preprocessing_details.get('modalities_in_output') or preprocessing_artifact.get('modalities')
+        if isinstance(modalities, (list, tuple)) and len(modalities) == 1:
+            modality_prefix = str(modalities[0])
+
+    X_train = pd.DataFrame(
+        latent,
+        columns=[f"{modality_prefix}__latent_{i + 1}" for i in range(latent.shape[1])],
+    )
+    return X_train, 'dimensionality_reduced_features'
+
+
 def _sorted_hof_candidates(candidates, optimisation):
+    """Handle sorted hof candidates."""
     candidates = list(candidates)
     if optimisation != 'multi' or len(candidates) <= 1:
         return candidates
@@ -2500,6 +2541,7 @@ def do_merge(args):
     )
 
     def _bootstrap_candidate(candidate_params, preprocessing_mode):
+        """Handle bootstrap candidate."""
         worker_args = (
             X_latent,
             ids_all,
@@ -2529,6 +2571,7 @@ def do_merge(args):
             return list(executor.map(_run_merge_bootstrap, range(n_boot_full), chunksize=chunksize))
 
     def _labels_from_consensus(candidate_params, stability_summary, consensus_cut_k):
+        """Handle labels from consensus."""
         consensus = stability_summary.get('consensus') if stability_summary else None
         union_ids = stability_summary.get('union_ids') if stability_summary else None
         if consensus is None or union_ids is None:
@@ -2687,6 +2730,7 @@ def do_merge(args):
     print('Final selected parameters across folds:', final_params)
 
     def _summarize_stability(preprocessing_mode, bootstrap_results, stability_summary=None):
+        """Summarize stability."""
         if stability_summary is None:
             stability_summary = consensus_pac_ccc(
                 bootstrap_results,
@@ -2758,7 +2802,12 @@ def do_merge(args):
         seed=4343,
     )
 
-    X_train = df_final.drop(columns=[args.subject_id_column], errors='ignore').reset_index(drop=True)
+    X_train, svm_feature_source = _simpleclust_svm_training_matrix(
+        args,
+        ae_res,
+        df_final,
+        preprocessing_artifact=preprocessing_artifact,
+    )
     svm_results = None
     svm_final_model = None
     svm_feature_names = list(X_train.columns) if isinstance(X_train, pd.DataFrame) else None
@@ -2821,6 +2870,7 @@ def do_merge(args):
         'svm_final_model': svm_final_model,
         'svm_feature_names': svm_feature_names,
         'svm_train_index': svm_train_index,
+        'svm_feature_source': svm_feature_source,
     }
 
     report_rows = []
@@ -2903,7 +2953,7 @@ def do_init(args):
             torch.manual_seed(args.seed)
 
     pop, _ = _build_grid_population(args)
-    
+
     os.makedirs(os.path.dirname(population_file) or '.', exist_ok=True)
     with open(population_file, 'wb') as f:
         dill.dump(pop, f)

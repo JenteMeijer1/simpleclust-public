@@ -1,3 +1,5 @@
+"""Define candidate generation and scoring for single-view clustering."""
+
 import re
 import os
 import sys
@@ -26,11 +28,13 @@ LINKAGES = ['complete', 'average', 'weighted', 'ward']
 
 class _Clusterer:
     def execute(self, data):
+        """Handle execute."""
         raise NotImplementedError
 
 
 class _HierarchicalClusterer(_Clusterer):
     def __init__(self, n_clusters=2, precomputed=False, linkage_method='average', linkage=None, **kwargs):
+        """Initialize the object."""
         self.n_clusters = int(max(1, n_clusters))
         self.precomputed = bool(precomputed)
         self.linkage_method = (linkage_method or linkage or 'average')
@@ -38,6 +42,7 @@ class _HierarchicalClusterer(_Clusterer):
             self.linkage_method = 'average'
 
     def execute(self, data):
+        """Handle execute."""
         X = np.asarray(data)
         if X.shape[0] <= 1 or self.n_clusters <= 1:
             return np.zeros(X.shape[0], dtype=int)
@@ -64,10 +69,12 @@ class _HierarchicalClusterer(_Clusterer):
 
 class _KMeansClusterer(_Clusterer):
     def __init__(self, n_clusters=2, random_state=42, **kwargs):
+        """Initialize the object."""
         self.n_clusters = int(max(1, n_clusters))
         self.random_state = random_state
 
     def execute(self, data):
+        """Handle execute."""
         X = np.asarray(data, dtype=float)
         if X.shape[0] <= 1 or self.n_clusters <= 1:
             return np.zeros(X.shape[0], dtype=int)
@@ -78,10 +85,12 @@ class _KMeansClusterer(_Clusterer):
 
 class _GMMClusterer(_Clusterer):
     def __init__(self, n_clusters=2, n_components=None, random_state=42, **kwargs):
+        """Initialize the object."""
         self.n_clusters = int(max(1, n_components or n_clusters))
         self.random_state = random_state
 
     def execute(self, data):
+        """Handle execute."""
         X = np.asarray(data, dtype=float)
         if X.shape[0] <= 1 or self.n_clusters <= 1:
             return np.zeros(X.shape[0], dtype=int)
@@ -92,11 +101,13 @@ class _GMMClusterer(_Clusterer):
 
 class _SpectralClusterer(_Clusterer):
     def __init__(self, n_clusters=2, precomputed=False, random_state=42, **kwargs):
+        """Initialize the object."""
         self.n_clusters = int(max(1, n_clusters))
         self.precomputed = bool(precomputed)
         self.random_state = random_state
 
     def execute(self, data):
+        """Handle execute."""
         X = np.asarray(data, dtype=float)
         n = X.shape[0]
         if n <= 1 or self.n_clusters <= 1:
@@ -117,6 +128,7 @@ class _SpectralClusterer(_Clusterer):
 
 class _MeanShiftClusterer(_Clusterer):
     def execute(self, data):
+        """Handle execute."""
         X = np.asarray(data, dtype=float)
         if X.shape[0] <= 1:
             return np.zeros(X.shape[0], dtype=int)
@@ -125,12 +137,14 @@ class _MeanShiftClusterer(_Clusterer):
 
 class _EnsembleClusterer(_Clusterer):
     def __init__(self, n_clusters=2, precomputed=False, linkage_method='average', linkage=None, random_state=42, **kwargs):
+        """Initialize the object."""
         self.n_clusters = int(max(1, n_clusters))
         self.precomputed = bool(precomputed)
         self.linkage_method = linkage_method or linkage or 'average'
         self.random_state = random_state
 
     def execute(self, data):
+        """Handle execute."""
         X = np.asarray(data, dtype=float)
         n = X.shape[0]
         if n <= 1 or self.n_clusters <= 1:
@@ -163,6 +177,7 @@ class _EnsembleClusterer(_Clusterer):
 
 
 def _consensus_from_labelings(labelings, n_clusters, linkage_method='average'):
+    """Handle consensus from labelings."""
     n = len(labelings[0])
     coassoc = np.zeros((n, n), dtype=float)
     for lab in labelings:
@@ -178,6 +193,7 @@ def _consensus_from_labelings(labelings, n_clusters, linkage_method='average'):
 # Public builder API
 
 def build_clusterer(kind: str, precomputed: bool = False, **kwargs):
+    """Build clusterer."""
     if kind not in CLUSTER_METHODS:
         raise ValueError(f"Unknown clusterer '{kind}'.")
     if kind == 'hierarchical':
@@ -197,16 +213,19 @@ def build_clusterer(kind: str, precomputed: bool = False, **kwargs):
 
 class View:
     def __init__(self, data, clusterer):
+        """Initialize the object."""
         self.data = np.asarray(data)
         self.clusterer = clusterer
         self.labels = None
 
     def execute(self):
+        """Handle execute."""
         self.labels = np.asarray(self.clusterer.execute(self.data), dtype=int)
         return self.labels
 
 
 def build_view(data, clusterer):
+    """Build view."""
     return View(data, clusterer)
 
 
@@ -217,20 +236,24 @@ class Fusion:
 
 class Agreement(Fusion):
     def __init__(self):
+        """Initialize the object."""
         super().__init__('agreement')
 
 
 class Disagreement(Fusion):
     def __init__(self):
+        """Initialize the object."""
         super().__init__('disagreement')
 
 
 class Consensus(Fusion):
     def __init__(self):
+        """Initialize the object."""
         super().__init__('consensus')
 
 
 def build_fuser(name: str):
+    """Build fuser."""
     name = str(name).lower()
     if name == 'agreement':
         return Agreement()
@@ -242,6 +265,7 @@ def build_fuser(name: str):
 
 
 def _coassociation_from_labels(labelings: List[np.ndarray]) -> np.ndarray:
+    """Handle coassociation from labels."""
     n = len(labelings[0])
     M = np.zeros((n, n), dtype=float)
     for lab in labelings:
@@ -253,6 +277,7 @@ def _coassociation_from_labels(labelings: List[np.ndarray]) -> np.ndarray:
 
 
 def consensus(labels: list):
+    """Handle consensus."""
     if len(labels) < 1:
         raise ValueError('labels must be non-empty')
     labmat = np.vstack([np.asarray(l) for l in labels]).T
@@ -269,6 +294,7 @@ def consensus(labels: list):
 
 
 def run_ensemble_fusion(views: List[View], fuser: Fusion, mincluster: str = 'FALSE', mincluster_n: int = 10, cluster_algorithm='ensemble'):
+    """Run ensemble fusion."""
     if not isinstance(views, list) or len(views) == 0:
         raise ValueError('views must be a non-empty list')
     member_labels = [np.asarray(v.execute(), dtype=int) for v in views]
@@ -296,6 +322,7 @@ def run_ensemble_fusion(views: List[View], fuser: Fusion, mincluster: str = 'FAL
 
 
 def _normalize_views(data):
+    """Normalize views."""
     if isinstance(data, np.ndarray):
         if data.ndim != 2:
             raise ValueError('Expected 2D array for clustering data.')
@@ -317,6 +344,7 @@ def _normalize_views(data):
 
 
 def _normalize_per_view_param(value, n_views, default):
+    """Normalize per view param."""
     if value is None:
         return [default] * n_views
     if isinstance(value, (list, tuple, np.ndarray)):
@@ -330,11 +358,13 @@ def _normalize_per_view_param(value, n_views, default):
 
 
 def _enforce_min_cluster_size(X, labels, min_size=10):
+    """Enforce min cluster size."""
     D = pairwise_distances(np.asarray(X, dtype=float))
     return enforce_min_cluster_size(D, labels, min_size=min_size)
 
 
 def _safe_quality(X, labels, precomputed=False):
+    """Handle safe quality."""
     labels = np.asarray(labels, dtype=int)
     if labels.size == 0 or len(np.unique(labels)) <= 1:
         return 0.0

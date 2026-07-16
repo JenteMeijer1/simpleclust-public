@@ -117,13 +117,13 @@ if [ ! -f "${SIF}" ] && [ ! -f "${BASE_DIR}/${SIF}" ]; then
   exit 2
 fi
 
-if [ -d "${BASE_DIR}/results" ]; then
-  metrics_count=$(find "${BASE_DIR}/results" -maxdepth 2 -path "${BASE_DIR}/results/fold*/metrics.pkl" -type f | wc -l | tr -d ' ')
+if [ -d "${RESULTS_DIR}" ]; then
+  metrics_count=$(find "${RESULTS_DIR}" -maxdepth 2 -path "${RESULTS_DIR}/fold*/metrics.pkl" -type f | wc -l | tr -d ' ')
 else
   metrics_count=0
 fi
 if [ "${metrics_count:-0}" -lt "${N_FOLDS}" ]; then
-  echo "ERROR: expected at least ${N_FOLDS} fold metrics files, found ${metrics_count:-0} under ${BASE_DIR}/results/fold*/metrics.pkl" >&2
+  echo "ERROR: expected at least ${N_FOLDS} fold metrics files, found ${metrics_count:-0} under ${RESULTS_DIR}/fold*/metrics.pkl" >&2
   exit 2
 fi
 

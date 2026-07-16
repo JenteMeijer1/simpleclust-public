@@ -1,4 +1,5 @@
 #!/bin/bash
+# Purpose: Score SimpleClust candidates across bootstrap samples.
 #SBATCH --job-name=grid_bootstrap
 #SBATCH --output=logs/bootstrap_%A_%a.log
 #SBATCH --nodes=1
